@@ -1,0 +1,122 @@
+================================================================================
+                                    DENIZENS
+                        Game Overview & Core Mechanics
+================================================================================
+
+1. OVERVIEW
+-----------
+Denizens is a cyclical, turn-based tactical battle game played on a hexagonal
+grid. The player commands a team of reptilian creatures across a series of
+battles against various mammalian enemies. Surviving battles allows creatures
+to evolve through 8 increasingly powerful and specialized stages.
+
+
+2. HEX FACINGS & DIRECTIONAL COMBAT
+-----------------------------------
+Every creature on the hex grid has an explicit orientation ("facing") aligned
+with one of the 6 sides of its hex. Relative to a creature's current orientation,
+the 6 surrounding hex directions are:
+
+  - Front        (forward facing)
+  - Front-Left
+  - Front-Right
+  - Flank-Left
+  - Flank-Right
+  - Rear
+
+Basic Combat Rules & Exceptions:
+  - Basic Forms (Stage 1): Can only attack into their Front hex and have
+    vulnerable flanks (Flank-Left, Flank-Right) and Rear when attacked from
+    those directions.
+  - Evolved Forms: Many higher stages break or modify standard facing rules
+    for offense or defense (for example, the Stage 8 Hydra can attack toward
+    Front, Front-Left, and Front-Right).
+
+
+3. PLAYER CREATURE CLASSES vs. ENEMIES
+--------------------------------------
+Player creatures belong to three reptilian classes, each with a distinct
+tactical identity:
+
+  1. Snakes (Serpents) : High attack, fragile defense.
+  2. Lizards           : High mobility, weak attack. Capitalize on mobility by
+                         moving in directions other than their Front facing and
+                         by choosing the order of Move and Attack actions.
+  3. Turtles           : High defense, low mobility tanks.
+
+Enemies (Mammals — Do Not Evolve):
+  - Opposing forces consist of 13 Mammal enemy forms encountered across the
+    cyclical battle progression:
+      1. Rat
+      2. Wolf
+      3. Bear
+      4. Lion
+      5. Griffon
+      6. Owlbear
+      7. Behemoth
+      8. Displacer Beast
+      9. Manticore
+     10. Rajang
+     11. Dire Wolf
+     12. Sabertooth
+     13. Hell Hound
+
+
+4. TURN-BASED MOVEMENT & ACTION RULES
+-------------------------------------
+Battles are turn-based. Creature movement is divided into two distinct parts:
+  - Rotations : Changing the creature's hex facing.
+  - Moves     : Entering new hexes on the board.
+
+Movement Rules & Exceptions:
+  - Basic Forms (Stage 1): Must move forward into the hex corresponding to
+    their current Front facing.
+  - Evolved & Class Exceptions: Specific classes and evolved forms override
+    basic movement constraints. In particular, Lizards can move in directions
+    other than their forward facing and can flexibly choose the order of their
+    Move and Attack actions during a turn.
+
+
+5. EVOLUTION SYSTEM (8 STAGES PER CLASS)
+----------------------------------------
+Each of the three player classes has 8 evolution stages (Stage 1 to Stage 8).
+Creatures evolve by surviving battles. Advancing from Stage N to Stage N+1
+requires surviving N additional battles (triangular number progression):
+
+  - Stage 1 -> Stage 2 : Survive 1 battle       (1 total battle survived)
+  - Stage 2 -> Stage 3 : Survive 2 more battles (3 total battles survived)
+  - Stage 3 -> Stage 4 : Survive 3 more battles (6 total battles survived)
+  - Stage 4 -> Stage 5 : Survive 4 more battles (10 total battles survived)
+  - Stage 5 -> Stage 6 : Survive 5 more battles (15 total battles survived)
+  - Stage 6 -> Stage 7 : Survive 6 more battles (21 total battles survived)
+  - Stage 7 -> Stage 8 : Survive 7 more battles (28 total battles survived)
+
+Serpent (Snake) 8-Stage Lineup:
+  1. Adder
+  2. Viper
+  3. Serpent
+  4. Jaculus
+  5. Amphisbaena
+  6. Wyrm
+  7. Basilisk
+  8. Hydra
+
+Lizard 8-Stage Lineup:
+  1. Newt
+  2. Horned Lizard
+  3. Monitor
+  4. Komodo
+  5. Wyrmling
+  6. Drake
+  7. Young Dragon
+  8. Tian Long
+
+Turtle 8-Stage Lineup:
+  1. Pond Turtle
+  2. Box Turtle
+  3. Snapper
+  4. Tortoise
+  5. Giant Snapper
+  6. Alligator Snapper
+  7. War Turtle
+  8. Dragon Turtle

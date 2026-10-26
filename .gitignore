@@ -1,0 +1,26 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache & test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Build / Pygbag / packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Compiled native tool binaries (keep .m/.c sources tracked)
+tools/make_transparent

@@ -1,0 +1,56 @@
+# Denizens — Project Overview & Agent Guidelines
+
+Keep the player-facing instructions file (`denizens.txt`) in sync whenever game rules, evolution stages, or creature mechanics change.
+
+@[denizens.txt](denizens.txt)
+
+---
+
+## Architectural Implications for Code & Rules (`rules.py`)
+
+When designing and implementing game logic for **Denizens**, ensure that the shared rules module (`rules.py`) models these mechanics cleanly so human UI and enemy/bot AI share the exact same validation and execution code:
+
+1. **Relative Hex Directions (6 Facings)**:
+   - Represent creature `facing` as an integer `0..5` corresponding to the 6 hex sides.
+   - Compute relative directions (`FRONT = 0`, `FRONT_RIGHT = 1`, `FLANK_RIGHT = 2`, `REAR = 3`, `FLANK_LEFT = 4`, `FRONT_LEFT = 5`) via modular arithmetic `(target_dir - facing) % 6`.
+   - Top-down creature sprites in `assets/` are drawn moving toward the **Top of the image (`North` / `0°`, which represents the `Front` hex facing)**, so rotating a sprite to match its hex facing is a clean multiple of `60°`.
+
+2. **Strict Top-Down Sprite Camera & Orientation Rule (All `topdown/` Assets ONLY)**:
+   - Every creature in a `topdown/` folder MUST appear to be moving toward the **top edge (12 o'clock)** of the image, which corresponds to the creature's **Front** facing when placed on a hex.
+   - The camera is strictly **90° overhead (dorsal bird's-eye view)**: only the **top (dorsal side) of the creature's head(s) and body** may be visible.
+   - Creature heads must look **forward along the ground plane toward the top of the image**, **NEVER** tilted upward to face/stare at the camera, and **NEVER** showing ventral/throat/underside neck scales as if rearing up at the viewer.
+   - *(Note: `portraits/` assets are character stat portraits and SHOULD show the creature's head/upper body from the front or dramatic three-quarter angle inside the unified gothic border frame.)*
+
+2. **Rule-Breaking Evolution Traits (Data-Driven Capabilities)**:
+   - Because Basic (Stage 1) creatures follow strict defaults (attack only `FRONT`; vulnerable on `FLANK_LEFT`, `FLANK_RIGHT`, `REAR`; move only toward `FRONT`; fixed action order), while evolved forms and classes break those rules:
+     - **Attack Arcs**: Define allowed relative attack directions per creature stage (default `{FRONT}`, e.g. Hydra `{FRONT, FRONT_LEFT, FRONT_RIGHT}`).
+     - **Vulnerability Arcs**: Define vulnerable relative incoming-attack directions per creature stage (default `{FLANK_LEFT, FLANK_RIGHT, REAR}`).
+     - **Movement Directions & Rotations**: Separate **Rotations** (changing facing) from **Moves** (hex translation), and define allowed relative move directions per creature/class (default `{FRONT}`, overridden by Lizards and specific evolved forms).
+     - **Action Ordering**: Support flexible ordering of `Move` and `Attack` phases per turn for classes/forms that grant it (such as Lizards).
+
+3. **Evolution Progression Formula**:
+   - Each class has **8 stages** (`1..8`).
+   - Advancing from stage $s$ to $s + 1$ requires surviving $s$ additional battles.
+   - Total cumulative battles survived required to reach stage $s$:
+     $$\text{total\_battles}(s) = \frac{(s - 1) \cdot s}{2}$$
+     (`0, 1, 3, 6, 10, 15, 21, 28` for Stages `1..8`).
+
+---
+
+## Asset Organization & Visual Standards
+
+- **8 Stages per Player Class**:
+  - **Serpent (Snakes)**: `01_adder`, `02_viper`, `03_serpent`, `04_jaculus`, `05_amphisbaena`, `06_wyrm`, `07_basilisk`, `08_hydra`
+    - Top-down hex sprites (`1024×1024` transparent RGBA PNGs): `assets/monsters/serpent/topdown/01_adder.png` .. `08_hydra.png`
+    - Stat portraits (`1024×1024` PNGs with unified Jaculus gothic iron-and-bronze frame): `assets/monsters/serpent/portraits/01_adder.png` .. `08_hydra.png`
+  - **Lizards**: `01_newt`, `02_horned`, `03_monitor`, `04_komodo`, `05_wyrmling`, `06_drake`, `07_young_dragon`, `08_tian_long`
+    - Top-down hex sprites (`1024×1024` transparent RGBA PNGs): `assets/monsters/lizard/topdown/01_newt.png` .. `08_tian_long.png`
+    - Stat portraits (`1024×1024` PNGs with unified Jaculus gothic iron-and-bronze frame): `assets/monsters/lizard/portraits/01_newt.png` .. `08_tian_long.png`
+  - **Turtles**: `01_pond_turtle`, `02_box_turtle`, `03_snapper`, `04_tortoise`, `05_giant_snapper`, `06_alligator_snapper`, `07_war_turtle`, `08_dragon_turtle`
+    - Top-down hex sprites (`1024×1024` transparent RGBA PNGs): `assets/monsters/turtle/topdown/01_pond_turtle.png` .. `08_dragon_turtle.png`
+    - Stat portraits (`1024×1024` PNGs with unified Jaculus gothic iron-and-bronze frame): `assets/monsters/turtle/portraits/01_pond_turtle.png` .. `08_dragon_turtle.png`
+  - **Mammals (Enemies — 13 Non-Evolving Forms)**: `01_rat`, `02_wolf`, `03_bear`, `04_lion`, `05_griffon`, `06_owlbear`, `07_behemoth`, `08_displacer_beast`, `09_manticore`, `10_rajang`, `11_dire_wolf`, `12_sabertooth`, `13_hell_hound`
+    - Top-down hex sprites (`1024×1024` transparent RGBA PNGs): `assets/monsters/mammal/topdown/01_rat.png` .. `13_hell_hound.png`
+    - Stat portraits (`1024×1024` PNGs with unified Jaculus gothic iron-and-bronze frame): `assets/monsters/mammal/portraits/01_rat.png` .. `13_hell_hound.png`
+- **Asset Processing Tool**:
+  - `tools/make_transparent.m` — Native macOS CoreGraphics/ImageIO utility for extracting transparent RGBA top-down sprites from `#181a1f` slate backgrounds and compositing the master gothic portrait frame (`--composite-frame`).
