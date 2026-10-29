@@ -208,5 +208,8 @@ Turtle 8-Stage Lineup:
                                or attack an enemy on a crimson target hex.
   - F Key                    : Execute attack against enemy in attack arc at
                                current juncture (BEFORE_ROTATE / AFTER_ROTATE /
-                               AFTER_MOVE).
-  - Space Key                : End current combat turn.
+                               AFTER_MOVE / AFTER_POST_ROTATE).
+  - Space Key                : End player combat turn (triggers Enemy Mammal AI
+                               turn).
+  - Enter / N Key (Defeat)   : Start a new Round 1 campaign if all player
+                               reptiles are slain.

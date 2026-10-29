@@ -669,7 +669,57 @@ class BattleRenderer:
         self.callouts = active_callouts
 
         self.draw_viewport_hud(state, status_message)
+        if state.phase == C.PHASE_DEFEAT:
+            self.draw_defeat_banner(state)
         self.screen.set_clip(None)
+
+    def draw_defeat_banner(self, state: rules.GameState) -> None:
+        """Render a centered gothic Defeat overlay banner when all player reptiles are slain."""
+        bw, bh = 680, 230
+        bx = self.camera.viewport_x + (self.camera.viewport_w - bw) // 2
+        by = (C.SCREEN_HEIGHT - bh) // 2
+        banner_rect = pygame.Rect(bx, by, bw, bh)
+
+        pygame.draw.rect(self.screen, (22, 16, 20), banner_rect, border_radius=12)
+        pygame.draw.rect(
+            self.screen, C.COLOR_TEXT_RED, banner_rect, width=3, border_radius=12
+        )
+
+        title = self.font_title.render(
+            "DEFEAT — YOUR REPTILE ARMY HAS FALLEN", True, C.COLOR_TEXT_RED
+        )
+        self.screen.blit(
+            title, (banner_rect.centerx - title.get_width() * 0.5, by + 28)
+        )
+
+        sub1 = self.font_subtitle.render(
+            f"Overwhelmed by the Mammal Wave in Round {state.round_number} (Turn {state.turn_number})",
+            True,
+            C.COLOR_TEXT_GOLD,
+        )
+        self.screen.blit(
+            sub1, (banner_rect.centerx - sub1.get_width() * 0.5, by + 76)
+        )
+
+        sub2 = self.font_body.render(
+            "Press Enter or N to raise a fresh Round 1 army of 6 Stage 1 reptiles.",
+            True,
+            C.COLOR_TEXT_MAIN,
+        )
+        self.screen.blit(
+            sub2, (banner_rect.centerx - sub2.get_width() * 0.5, by + 114)
+        )
+
+        btn_rect = pygame.Rect(banner_rect.centerx - 170, by + 158, 340, 46)
+        self.buttons.append(
+            UIButton(
+                btn_rect,
+                "Start New Campaign [Enter / N]",
+                "new_game",
+                enabled=True,
+                accent_color=(155, 58, 58),
+            )
+        )
 
     def draw_viewport_hud(self, state: rules.GameState, status_message: str) -> None:
         hud_x = self.camera.viewport_x + 18
@@ -693,11 +743,25 @@ class BattleRenderer:
                 "Drag reptiles from Left Reserve onto lower-half green hexes  |  "
                 "Wheel / Q-E / Left-Right: Rotate  |  Enter: Confirm Deployment"
             )
+        elif state.phase == C.PHASE_DEFEAT:
+            header_txt = (
+                f"ROUND {state.round_number} DEFEAT   •   "
+                f"ALL PLAYER REPTILES SLAIN ON TURN {state.turn_number}"
+            )
+            header_col = C.COLOR_TEXT_RED
+            controls_txt = (
+                "Press Enter or N (or click Start New Campaign) to begin a new Round 1 campaign."
+            )
         else:
             enemies_alive = sum(
                 1
                 for u in state.units.values()
                 if u.is_alive and u.team == C.TEAM_ENEMY
+            )
+            players_alive = sum(
+                1
+                for u in state.units.values()
+                if u.is_alive and u.team == C.TEAM_PLAYER
             )
             if enemies_alive == 0:
                 header_txt = (
@@ -711,16 +775,20 @@ class BattleRenderer:
                     if state.active_team == C.TEAM_PLAYER
                     else C.COLOR_TEXT_RED
                 )
+                turn_tag = (
+                    "YOUR TURN"
+                    if state.active_team == C.TEAM_PLAYER
+                    else "ENEMY MAMMAL AI TURN"
+                )
                 header_txt = (
-                    f"ROUND {state.round_number}  •  TURN {state.turn_number}  •  "
-                    f"ACTIVE TEAM: {state.active_team.upper()}  •  "
-                    f"ENEMY MAMMALS ALIVE: {enemies_alive}"
+                    f"ROUND {state.round_number}  •  TURN {state.turn_number} ({turn_tag})  •  "
+                    f"REPTILES: {players_alive}  •  MAMMALS: {enemies_alive}"
                 )
                 header_col = team_col
             controls_txt = (
                 "L-Click: Select / Move / Attack Red Target Hex  |  "
                 "Wheel / Left-Right / Q-E / R-Click Adj Hex: Rotate  |  "
-                "F: Attack  |  Space: Next Combat Turn"
+                "F: Attack  |  Space: End Turn"
             )
 
         header = self.font_subtitle.render(header_txt, True, header_col)
@@ -987,6 +1055,10 @@ class BattleRenderer:
         unit = state.get_unit(state.selected_unit_id)
         if unit is None and hovered_hex is not None:
             unit = state.get_unit_at_hex(hovered_hex)
+        if unit is None:
+            living = [u for u in state.units.values() if u.is_alive]
+            if living:
+                unit = living[0]
 
         x0 = C.SIDEBAR_X + 24
         y = 18
@@ -1002,6 +1074,7 @@ class BattleRenderer:
                 C.COLOR_TEXT_MUTED,
             )
             self.screen.blit(empty_msg, (x0, y + 40))
+            self._draw_all_buttons()
             return
 
         spec = unit.spec
@@ -1169,9 +1242,24 @@ class BattleRenderer:
                     accent_color=(60, 155, 95),
                 )
             )
+        elif state.phase == C.PHASE_DEFEAT:
+            row1_y = y
+            self.buttons.append(
+                UIButton(
+                    pygame.Rect(x0, row1_y, card_w, btn_h + 6),
+                    "Start New Campaign [Enter / N]",
+                    "new_game",
+                    enabled=True,
+                    accent_color=(155, 58, 58),
+                )
+            )
         else:
-            can_rot_ccw = ((unit.facing - 1) % 6) in legal_rots
-            can_rot_cw = ((unit.facing + 1) % 6) in legal_rots
+            is_player_control = (
+                state.phase == C.PHASE_SETUP
+                or state.active_team == C.TEAM_PLAYER
+            )
+            can_rot_ccw = is_player_control and (((unit.facing - 1) % 6) in legal_rots)
+            can_rot_cw = is_player_control and (((unit.facing + 1) % 6) in legal_rots)
 
             row1_y = y
             self.buttons.append(
@@ -1220,20 +1308,40 @@ class BattleRenderer:
                         pygame.Rect(x0, row2_y, btn_w, btn_h),
                         f"Attack ({unit.juncture[:10]}) [F]",
                         "juncture_attack",
-                        enabled=can_exec_atk,
+                        enabled=is_player_control and can_exec_atk,
                         accent_color=(165, 70, 65),
                     )
+                )
+                end_lbl = (
+                    "End Turn [Space]"
+                    if state.active_team == C.TEAM_PLAYER
+                    else "Enemy Turn..."
                 )
                 self.buttons.append(
                     UIButton(
                         pygame.Rect(x0 + btn_w + 12, row2_y, btn_w, btn_h),
-                        "End Turn [Space]",
+                        end_lbl,
                         "end_turn",
-                        enabled=rules.can_end_turn(state),
+                        enabled=(
+                            state.active_team == C.TEAM_PLAYER
+                            and rules.can_end_turn(state)
+                        ),
                         accent_color=(70, 140, 90),
                     )
                 )
 
+        self._draw_all_buttons()
+
+        footer_y = C.SCREEN_HEIGHT - 26
+        footer_surf = self.font_small.render(
+            f"DEBUG={C.DEBUG}  •  MAX_ARMY_SIZE={state.max_army_size}  •  "
+            f"REINFORCEMENTS_BASE={state.reinforcements_per_round}",
+            True,
+            C.COLOR_TEXT_MUTED,
+        )
+        self.screen.blit(footer_surf, (x0, footer_y))
+
+    def _draw_all_buttons(self) -> None:
         mx, my = pygame.mouse.get_pos()
         for btn in self.buttons:
             hovered = btn.rect.collidepoint(mx, my) and btn.enabled
@@ -1260,12 +1368,3 @@ class BattleRenderer:
                     btn.rect.centery - lbl.get_height() * 0.5,
                 ),
             )
-
-        footer_y = C.SCREEN_HEIGHT - 26
-        footer_surf = self.font_small.render(
-            f"DEBUG={C.DEBUG}  •  MAX_ARMY_SIZE={state.max_army_size}  •  "
-            f"REINFORCEMENTS_BASE={state.reinforcements_per_round}",
-            True,
-            C.COLOR_TEXT_MUTED,
-        )
-        self.screen.blit(footer_surf, (x0, footer_y))

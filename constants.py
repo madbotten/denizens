@@ -44,6 +44,9 @@ GAME_MODE_ADVANCED: str = "advanced"
 PHASE_SETUP: str = "SETUP"
 PHASE_BATTLE: str = "BATTLE"
 PHASE_EVOLUTION: str = "EVOLUTION"
+PHASE_DEFEAT: str = "DEFEAT"
+
+AI_STEP_DELAY_MS: int = 240  # Milliseconds between visible Enemy Mammal AI steps
 
 # Teams
 TEAM_PLAYER: str = "player"

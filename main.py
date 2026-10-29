@@ -50,6 +50,9 @@ class DenizensApp:
         self.pan_start_pos: Tuple[int, int] = (0, 0)
         self.pan_drag_distance: float = 0.0
 
+        # Pacing timer for visible step-by-step Enemy Mammal AI actions
+        self.next_ai_step_ms: int = 0
+
         self.status_message: str = (
             "Round 1 Setup: Drag all 6 reptiles from the Left Reserve onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
         )
@@ -71,6 +74,8 @@ class DenizensApp:
                 f"   *** VICTORY! Entering Evolution Phase ({len(self.state.evolution_records)} survivors, "
                 f"{leveled_cnt} evolved) — Press Enter or click Confirm Evolution! ***"
             )
+        elif self.state.phase == C.PHASE_DEFEAT:
+            summary += "   *** DEFEAT! All of your reptiles have been slain! Press Enter or N for a New Campaign. ***"
         elif rules.are_all_enemies_slain(self.state):
             summary += "   *** VICTORY! All Enemy Mammals Slain! ***"
         self.status_message = summary
@@ -138,6 +143,8 @@ class DenizensApp:
                 )
 
         elif action_id == "end_turn":
+            if self.state.active_team != C.TEAM_PLAYER:
+                return
             if rules.end_turn(self.state):
                 if self.state.phase == C.PHASE_EVOLUTION:
                     leveled_cnt = sum(
@@ -146,6 +153,15 @@ class DenizensApp:
                     self.status_message = (
                         f"Battle Won! Evolution Phase: {len(self.state.evolution_records)} survivors "
                         f"({leveled_cnt} evolved). Press Enter or click Confirm Evolution."
+                    )
+                elif self.state.phase == C.PHASE_DEFEAT:
+                    self.status_message = (
+                        "Defeat! All of your reptiles have fallen. Press Enter or N to start a new campaign."
+                    )
+                elif self.state.active_team == C.TEAM_ENEMY:
+                    self.next_ai_step_ms = pygame.time.get_ticks() + C.AI_STEP_DELAY_MS
+                    self.status_message = (
+                        f"Enemy Mammal AI Turn {self.state.turn_number} in progress..."
                     )
                 else:
                     enemies_left = sum(
@@ -159,6 +175,15 @@ class DenizensApp:
                     )
             else:
                 self.status_message = "Cannot end turn while a flying creature is overlapping another unit!"
+
+        elif action_id == "new_game":
+            self.state = rules.create_initial_game_state(
+                game_mode=self.state.game_mode
+            )
+            self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
+            self.status_message = (
+                "New Campaign (Round 1 Setup): Drag all 6 reptiles from the Left Reserve onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
+            )
 
         elif action_id == "confirm_evolution":
             if rules.confirm_evolution_phase(self.state):
@@ -335,13 +360,24 @@ class DenizensApp:
                         self.handle_action("confirm_deployment")
                     elif self.state.phase == C.PHASE_EVOLUTION:
                         self.handle_action("confirm_evolution")
+                    elif self.state.phase == C.PHASE_DEFEAT:
+                        self.handle_action("new_game")
+                elif event.key == pygame.K_n and self.state.phase == C.PHASE_DEFEAT:
+                    self.handle_action("new_game")
                 elif event.key in (pygame.K_BACKSPACE, pygame.K_DELETE):
                     if self.state.phase == C.PHASE_SETUP:
                         self.handle_action("undeploy_unit")
                 elif event.key == pygame.K_f:
-                    self.handle_action("juncture_attack")
+                    if (
+                        self.state.phase == C.PHASE_BATTLE
+                        and self.state.active_team == C.TEAM_PLAYER
+                    ):
+                        self.handle_action("juncture_attack")
                 elif event.key == pygame.K_SPACE:
-                    if self.state.phase == C.PHASE_BATTLE:
+                    if (
+                        self.state.phase == C.PHASE_BATTLE
+                        and self.state.active_team == C.TEAM_PLAYER
+                    ):
                         self.handle_action("end_turn")
                 elif event.key in (pygame.K_c, pygame.K_HOME):
                     self.handle_action("reset_camera")
@@ -476,10 +512,31 @@ class DenizensApp:
 
         return True
 
+    def update_ai_turn(self) -> None:
+        """Step through Enemy Mammal AI actions at a readable pace during `TEAM_ENEMY`'s turn."""
+        if (
+            self.state.phase != C.PHASE_BATTLE
+            or self.state.active_team != C.TEAM_ENEMY
+        ):
+            return
+
+        now_ms = pygame.time.get_ticks()
+        if now_ms < self.next_ai_step_ms:
+            return
+
+        rec = rules.execute_next_ai_action(self.state)
+        self.next_ai_step_ms = now_ms + C.AI_STEP_DELAY_MS
+        if rec is not None:
+            if rec.attack_results:
+                self._report_attack_results(rec.attack_results)
+            else:
+                self.status_message = rec.description
+
     def run(self) -> None:
         running = True
         while running:
             running = self.process_events()
+            self.update_ai_turn()
             mouse_pos = pygame.mouse.get_pos()
             self.renderer.draw_frame(
                 self.state,

@@ -45,6 +45,7 @@ from constants import (
     JUNCTURE_BEFORE_ROTATE,
     MAX_ARMY_SIZE,
     PHASE_BATTLE,
+    PHASE_DEFEAT,
     PHASE_EVOLUTION,
     PHASE_SETUP,
     PLAYER_CLASSES,
@@ -181,6 +182,18 @@ class AttackResult:
 
 
 @dataclass
+class AIActionRecord:
+    """Records a single atomic Enemy Mammal AI action executed via shared `rules.py` helpers."""
+    action_type: str  # "rotate", "move", "attack", or "end_turn"
+    unit_id: Optional[str]
+    unit_name: str = ""
+    target_hex: Optional[HexCoord] = None
+    new_facing: Optional[int] = None
+    attack_results: List[AttackResult] = field(default_factory=list)
+    description: str = ""
+
+
+@dataclass
 class GameState:
     """Complete state of a Denizens tactical battle and persistent army."""
     arena_radius: int = ARENA_RADIUS
@@ -195,7 +208,8 @@ class GameState:
     max_army_size: int = MAX_ARMY_SIZE
     reinforcements_per_round: int = REINFORCEMENTS_BASE
     next_unit_seq: int = 1
-    enemy_ai_enabled: bool = False
+    enemy_ai_enabled: bool = True
+    ai_acted_unit_ids: Set[str] = field(default_factory=set)
     evolution_records: List[EvolutionRecord] = field(default_factory=list)
     last_attack_results: List[AttackResult] = field(default_factory=list)
 
@@ -342,6 +356,7 @@ def confirm_deployment(state: GameState) -> bool:
     state.phase = PHASE_BATTLE
     state.active_team = TEAM_PLAYER
     state.turn_number = 1
+    state.ai_acted_unit_ids.clear()
     for unit in state.units.values():
         if unit.is_alive:
             unit.reset_for_turn()
@@ -676,6 +691,16 @@ def can_reach_empty_landing_hex(
         for u in state.units.values()
         if u.is_deployed and u.unit_id != moving_unit_id and u.hex_pos is not None
     }
+    moving_unit = state.get_unit(moving_unit_id)
+    takeoff_hex: Optional[HexCoord] = (
+        moving_unit.hex_pos
+        if (
+            moving_unit is not None
+            and moving_unit.hex_pos is not None
+            and not is_unit_overlapping(state, moving_unit_id)
+        )
+        else None
+    )
 
     visited: Set[Tuple[HexCoord, int, int]] = set()
     queue: deque[Tuple[HexCoord, int, int]] = deque([(start_hex, start_facing % 6, remaining_steps)])
@@ -694,7 +719,7 @@ def can_reach_empty_landing_hex(
                 nxt_hex = hex_neighbor(cur_hex, abs_dir)
                 if not is_valid_hex(nxt_hex[0], nxt_hex[1], state.arena_radius):
                     continue
-                if nxt_hex not in occupied:
+                if nxt_hex not in occupied and nxt_hex != takeoff_hex:
                     return True
                 if spec.can_fly and steps_left - 1 > 0:
                     state_key = (nxt_hex, new_facing, steps_left - 1)
@@ -875,6 +900,41 @@ def _move_step_index(unit: Unit) -> Optional[int]:
     return None
 
 
+def _get_legal_moves_for_step_and_facing(
+    state: GameState, unit: Unit, target_step: int, cand_facing: int
+) -> List[HexCoord]:
+    """
+    Shared rules helper: return the legal destination hexes `unit` can move into on
+    `target_step` when oriented at `cand_facing`.
+    If a destination hex is occupied by another unit, moving onto it is legal IF AND ONLY IF
+    `unit.spec.can_fly` is True, `steps_left_after >= 1`, and `can_reach_empty_landing_hex`
+    confirms the flyer can still land on an empty hex before its moves run out.
+    """
+    if unit.hex_pos is None or target_step >= unit.spec.num_rotate_moves:
+        return []
+
+    spec = unit.spec
+    steps_left_after = (spec.num_rotate_moves - 1) - target_step
+    legal_hexes: List[HexCoord] = []
+
+    for rel_dir in sorted(spec.legal_move_dirs):
+        abs_dir = absolute_direction(cand_facing, rel_dir)
+        dest = hex_neighbor(unit.hex_pos, abs_dir)
+        if not is_valid_hex(dest[0], dest[1], state.arena_radius):
+            continue
+
+        occupant = state.get_unit_at_hex(dest, exclude_unit_id=unit.unit_id)
+        if occupant is None:
+            legal_hexes.append(dest)
+        elif spec.can_fly and steps_left_after >= 1:
+            if can_reach_empty_landing_hex(
+                state, dest, cand_facing, steps_left_after, spec, unit.unit_id
+            ):
+                legal_hexes.append(dest)
+
+    return legal_hexes
+
+
 def get_legal_moves(state: GameState, unit_id: str) -> List[HexCoord]:
     """
     Return all legal destination hex coordinates that `unit_id` can move into right now,
@@ -890,26 +950,7 @@ def get_legal_moves(state: GameState, unit_id: str) -> List[HexCoord]:
     if target_step is None:
         return []
 
-    spec = unit.spec
-    steps_left_after = (spec.num_rotate_moves - 1) - target_step
-    legal_hexes: List[HexCoord] = []
-
-    for rel_dir in sorted(spec.legal_move_dirs):
-        abs_dir = absolute_direction(unit.facing, rel_dir)
-        dest = hex_neighbor(unit.hex_pos, abs_dir)
-        if not is_valid_hex(dest[0], dest[1], state.arena_radius):
-            continue
-
-        occupant = state.get_unit_at_hex(dest, exclude_unit_id=unit_id)
-        if occupant is None:
-            legal_hexes.append(dest)
-        elif spec.can_fly and steps_left_after >= 1:
-            if can_reach_empty_landing_hex(
-                state, dest, unit.facing, steps_left_after, spec, unit_id
-            ):
-                legal_hexes.append(dest)
-
-    return legal_hexes
+    return _get_legal_moves_for_step_and_facing(state, unit, target_step, unit.facing)
 
 
 def move_unit(state: GameState, unit_id: str, target_hex: HexCoord) -> bool:
@@ -1181,12 +1222,19 @@ def execute_attack(
     state.last_attack_results = results
     if are_all_enemies_slain(state):
         complete_battle_to_evolution(state)
+    elif are_all_players_slain(state):
+        state.phase = PHASE_DEFEAT
     return results
 
 
 def are_all_enemies_slain(state: GameState) -> bool:
     """Return True if no living enemy Mammal units remain in the battle."""
     return not any(u.is_alive and u.team == TEAM_ENEMY for u in state.units.values())
+
+
+def are_all_players_slain(state: GameState) -> bool:
+    """Return True if no living human player Reptile units remain in the battle."""
+    return not any(u.is_alive and u.team == TEAM_PLAYER for u in state.units.values())
 
 
 def can_end_turn(state: GameState) -> bool:
@@ -1202,8 +1250,9 @@ def can_end_turn(state: GameState) -> bool:
 def end_turn(state: GameState) -> bool:
     """
     Advance the combat turn and reset turn counters for all living units.
-    When `state.enemy_ai_enabled` is False (Phase 3), keeps `active_team = TEAM_PLAYER`
-    and increments `turn_number` so the player can attack and slay the mammals across turns.
+    When `state.enemy_ai_enabled` is True, alternates `active_team` between
+    `TEAM_PLAYER` and `TEAM_ENEMY` (incrementing `turn_number` at the start of
+    each `TEAM_PLAYER` turn).
     Returns False if a flying unit is still overlapping another unit's hex.
     """
     if not can_end_turn(state):
@@ -1219,10 +1268,12 @@ def end_turn(state: GameState) -> bool:
         state.active_team = TEAM_PLAYER
         state.turn_number += 1
 
+    state.ai_acted_unit_ids.clear()
+
     for unit in list(state.units.values()):
         if not unit.is_alive:
             continue
-        if unit.is_deployed:
+        if unit.is_deployed and unit.team == state.active_team:
             if "regeneration" in unit.spec.special_powers and unit.hp < unit.spec.max_hp:
                 unit.hp = min(unit.spec.max_hp, unit.hp + 2)
             if unit.poison_stacks > 0:
@@ -1234,8 +1285,393 @@ def end_turn(state: GameState) -> bool:
 
     if are_all_enemies_slain(state):
         complete_battle_to_evolution(state)
+    elif are_all_players_slain(state):
+        state.phase = PHASE_DEFEAT
+    elif state.active_team == TEAM_PLAYER:
+        sel = state.get_unit(state.selected_unit_id)
+        if sel is None or not sel.is_deployed or sel.team != TEAM_PLAYER:
+            deployed_players = [
+                u for u in state.get_player_army_units() if u.is_deployed
+            ]
+            if deployed_players:
+                state.selected_unit_id = deployed_players[0].unit_id
 
     return True
+
+
+# ============================================================================
+# Shared-Rules Enemy Mammal AI (Selection Only; Execution via Shared Helpers)
+# ============================================================================
+
+def _best_ai_attack_right_now(
+    state: GameState, unit: Unit
+) -> Optional[Tuple[HexCoord, float]]:
+    """
+    Inspect `get_legal_attack_targets(state, unit.unit_id)` and return `(best_target_hex, score)`
+    using `compute_attack_damage`, or `None` if no legal target is in arc right now.
+    """
+    legal_targets = get_legal_attack_targets(state, unit.unit_id)
+    if not legal_targets:
+        return None
+
+    best_hex: Optional[HexCoord] = None
+    best_score = -1e9
+    for t_hex in legal_targets:
+        defender = state.get_unit_at_hex(t_hex, exclude_unit_id=unit.unit_id)
+        if defender is None:
+            continue
+        dmg, _, is_vuln, _ = compute_attack_damage(state, unit, defender)
+        is_kill = dmg >= defender.hp
+        score = (
+            dmg * 30.0
+            + (400.0 if is_kill else 0.0)
+            + (45.0 if is_vuln else 0.0)
+            + defender.spec.point_cost * 5.0
+        )
+        if score > best_score:
+            best_score = score
+            best_hex = t_hex
+
+    if best_hex is None:
+        return None
+    return (best_hex, best_score)
+
+
+def _potential_attack_score_at(
+    state: GameState, unit: Unit, cand_hex: HexCoord, cand_facing: int
+) -> float:
+    """
+    Return the best attack score `unit` could achieve if standing on empty `cand_hex`
+    with orientation `cand_facing`.
+    """
+    if state.get_unit_at_hex(cand_hex, exclude_unit_id=unit.unit_id) is not None:
+        return 0.0
+
+    saved_hex = unit.hex_pos
+    saved_facing = unit.facing
+    best_score = 0.0
+    try:
+        unit.hex_pos = cand_hex
+        unit.facing = cand_facing
+        for rel_dir in unit.spec.attack_arcs:
+            abs_dir = absolute_direction(cand_facing, rel_dir)
+            t_hex = hex_neighbor(cand_hex, abs_dir)
+            if not is_valid_hex(t_hex[0], t_hex[1], state.arena_radius):
+                continue
+            defender = state.get_unit_at_hex(t_hex, exclude_unit_id=unit.unit_id)
+            if defender is None or defender.team == unit.team:
+                continue
+            dmg, _, is_vuln, _ = compute_attack_damage(state, unit, defender)
+            is_kill = dmg >= defender.hp
+            score = (
+                dmg * 30.0
+                + (400.0 if is_kill else 0.0)
+                + (45.0 if is_vuln else 0.0)
+                + defender.spec.point_cost * 5.0
+            )
+            if score > best_score:
+                best_score = score
+    finally:
+        unit.hex_pos = saved_hex
+        unit.facing = saved_facing
+
+    return best_score
+
+
+def _score_ai_state(
+    state: GameState,
+    unit: Unit,
+    cand_hex: HexCoord,
+    cand_facing: int,
+    can_attack_after: bool,
+) -> float:
+    """
+    Evaluate the tactical desirability of `(cand_hex, cand_facing)` for an Enemy Mammal unit.
+    Rewards closing distance to player reptiles, setting up high-damage/flank/rear attacks,
+    and orienting `FORWARD` toward nearby enemies to protect vulnerable flanks/rear.
+    """
+    player_units = [
+        u
+        for u in state.units.values()
+        if u.is_deployed and u.team == TEAM_PLAYER and u.hex_pos is not None
+    ]
+    if not player_units:
+        return 0.0
+
+    # Nearest living player reptile (tie-break by lower HP, then higher point_cost)
+    nearest_pu = min(
+        player_units,
+        key=lambda pu: (
+            hex_distance(cand_hex, pu.hex_pos),  # type: ignore[arg-type]
+            pu.hp,
+            -pu.spec.point_cost,
+        ),
+    )
+    assert nearest_pu.hex_pos is not None
+    min_dist = hex_distance(cand_hex, nearest_pu.hex_pos)
+
+    # Prefer melee adjacency (min_dist == 1)
+    score = -abs(min_dist - 1) * 38.0 - min_dist * 4.0
+
+    # Slight tie-break preference for empty hexes over occupied fly-over hexes at equal distance,
+    # while still allowing flyers to cross occupied blockers to reduce distance to player units.
+    if state.get_unit_at_hex(cand_hex, exclude_unit_id=unit.unit_id) is not None:
+        score -= 6.0
+
+    # Reward immediate attack opportunity from `(cand_hex, cand_facing)`
+    if can_attack_after:
+        atk_score = _potential_attack_score_at(state, unit, cand_hex, cand_facing)
+        if atk_score > 0.0:
+            score += 500.0 + atk_score
+
+    # Orient facing toward the nearest player reptile
+    best_dir_to_nearest = min(
+        range(6),
+        key=lambda d: hex_distance(
+            hex_neighbor(cand_hex, d), nearest_pu.hex_pos  # type: ignore[arg-type]
+        ),
+    )
+    score -= hex_angle_distance(cand_facing, best_dir_to_nearest) * 8.0
+
+    # Flanking & defensive orientation around adjacent player units
+    for pu in player_units:
+        if pu.hex_pos is None:
+            continue
+        if hex_distance(cand_hex, pu.hex_pos) == 1:
+            # Threatening a player unit's vulnerable flank/rear
+            inc_on_pu = hex_direction_between(cand_hex, pu.hex_pos)
+            if inc_on_pu is not None:
+                rel_on_pu = relative_direction(pu.facing, inc_on_pu)
+                if rel_on_pu in pu.spec.vulnerable_arcs:
+                    score += 14.0
+            # Avoid exposing our own vulnerable arcs to an adjacent player unit's attack arc
+            inc_on_us = hex_direction_between(pu.hex_pos, cand_hex)
+            if inc_on_us is not None:
+                rel_on_us = relative_direction(cand_facing, inc_on_us)
+                if rel_on_us in unit.spec.vulnerable_arcs:
+                    score -= 10.0
+
+    return score
+
+
+def execute_next_ai_action(state: GameState) -> Optional[AIActionRecord]:
+    """
+    Execute a single atomic Enemy Mammal AI action (`rotate_unit`, `move_unit`,
+    `execute_attack`, or `end_turn`) using ONLY shared `rules.py` helpers.
+
+    Returns an `AIActionRecord` describing the action taken, or `None` if not in
+    the Enemy team's battle turn.
+    """
+    if state.phase != PHASE_BATTLE or state.active_team != TEAM_ENEMY:
+        return None
+
+    player_units = [
+        u
+        for u in state.units.values()
+        if u.is_deployed and u.team == TEAM_PLAYER and u.hex_pos is not None
+    ]
+    enemy_units = [
+        u
+        for u in state.units.values()
+        if u.is_deployed
+        and u.team == TEAM_ENEMY
+        and u.hex_pos is not None
+        and u.unit_id not in state.ai_acted_unit_ids
+    ]
+
+    # Order enemy units front-to-back (closest to player army first)
+    if player_units:
+        enemy_units.sort(
+            key=lambda eu: (
+                min(
+                    hex_distance(eu.hex_pos, pu.hex_pos)  # type: ignore[arg-type]
+                    for pu in player_units
+                ),
+                eu.unit_id,
+            )
+        )
+    else:
+        enemy_units.sort(key=lambda eu: eu.unit_id)
+
+    for unit in enemy_units:
+        assert unit.hex_pos is not None
+        state.selected_unit_id = unit.unit_id
+        attacks_left = unit.spec.total_attacks_per_move - unit.attacks_used
+
+        # 1. Check if `unit` can attack right now at its current juncture
+        now_atk = _best_ai_attack_right_now(state, unit)
+        if now_atk is not None:
+            target_hex, now_atk_score = now_atk
+            should_attack_now = False
+            if attacks_left >= 2 or unit.moves_remaining == 0:
+                should_attack_now = True
+            else:
+                # Check if rotating/moving on this step can yield a strictly better attack
+                step_idx = _move_step_index(unit)
+                best_alt_atk = 0.0
+                if step_idx is not None:
+                    cand_rots = (
+                        [unit.facing]
+                        if unit.juncture == JUNCTURE_AFTER_ROTATE
+                        else [unit.facing]
+                        + [
+                            f
+                            for f in get_legal_rotations(state, unit.unit_id)
+                            if f != unit.facing
+                        ]
+                    )
+                    for cf in cand_rots:
+                        best_alt_atk = max(
+                            best_alt_atk,
+                            _potential_attack_score_at(state, unit, unit.hex_pos, cf),
+                        )
+                        for dest in _get_legal_moves_for_step_and_facing(
+                            state, unit, step_idx, cf
+                        ):
+                            best_alt_atk = max(
+                                best_alt_atk,
+                                _potential_attack_score_at(state, unit, dest, cf),
+                            )
+                if now_atk_score >= best_alt_atk - 5.0:
+                    should_attack_now = True
+
+            if should_attack_now:
+                results = execute_attack(state, unit.unit_id, target_hex)
+                if results:
+                    first = results[0]
+                    desc = (
+                        f"Enemy {unit.spec.name} attacked {first.defender_name} "
+                        f"for {first.damage} dmg"
+                        + (" (SLAIN!)" if first.defender_slain else "")
+                    )
+                    return AIActionRecord(
+                        action_type="attack",
+                        unit_id=unit.unit_id,
+                        unit_name=unit.spec.name,
+                        target_hex=target_hex,
+                        attack_results=results,
+                        description=desc,
+                    )
+
+        # 2. If at JUNCTURE_AFTER_ROTATE, `unit` has already rotated for `current_step`,
+        #    so only consider moving on `current_step` (never re-rotating in the same step).
+        overlapping = is_unit_overlapping(state, unit.unit_id)
+        if unit.juncture == JUNCTURE_AFTER_ROTATE:
+            legal_mvs = get_legal_moves(state, unit.unit_id)
+            can_atk_after_move = (unit.attacks_used < unit.spec.total_attacks_per_move)
+            best_dest: Optional[HexCoord] = None
+            best_score = (
+                -1e9
+                if overlapping
+                else _score_ai_state(
+                    state, unit, unit.hex_pos, unit.facing, can_atk_after_move
+                )
+            )
+            for dest in legal_mvs:
+                sc = _score_ai_state(state, unit, dest, unit.facing, can_atk_after_move)
+                if sc > best_score + 0.5:
+                    best_score = sc
+                    best_dest = dest
+
+            if best_dest is not None and move_unit(state, unit.unit_id, best_dest):
+                return AIActionRecord(
+                    action_type="move",
+                    unit_id=unit.unit_id,
+                    unit_name=unit.spec.name,
+                    target_hex=best_dest,
+                    description=f"Enemy {unit.spec.name} moved to {best_dest}.",
+                )
+
+            # Finished with current_step (skipped moving after rotating)
+            state.ai_acted_unit_ids.add(unit.unit_id)
+            continue
+
+        # 3. If at JUNCTURE_AFTER_POST_ROTATE, no moves or rotations remain
+        if unit.juncture == JUNCTURE_AFTER_POST_ROTATE:
+            state.ai_acted_unit_ids.add(unit.unit_id)
+            continue
+
+        # 4. At JUNCTURE_BEFORE_ROTATE or JUNCTURE_AFTER_MOVE:
+        #    Evaluate `(cand_facing, cand_dest_hex)` for the upcoming Rotate-Move step
+        step_idx = _move_step_index(unit)
+        if step_idx is None:
+            state.ai_acted_unit_ids.add(unit.unit_id)
+            continue
+
+        legal_rots = get_legal_rotations(state, unit.unit_id)
+        cand_facings = [unit.facing] + [f for f in legal_rots if f != unit.facing]
+        can_atk_after = unit.attacks_used < unit.spec.total_attacks_per_move
+
+        best_cf = unit.facing
+        best_dest = unit.hex_pos
+        best_score = (
+            -1e9
+            if overlapping
+            else _score_ai_state(
+                state, unit, unit.hex_pos, unit.facing, can_atk_after
+            )
+        )
+
+        for cf in cand_facings:
+            if not overlapping:
+                stay_sc = _score_ai_state(state, unit, unit.hex_pos, cf, can_atk_after)
+                if stay_sc > best_score + 0.5:
+                    best_score = stay_sc
+                    best_cf = cf
+                    best_dest = unit.hex_pos
+
+            for dest in _get_legal_moves_for_step_and_facing(state, unit, step_idx, cf):
+                mv_sc = _score_ai_state(state, unit, dest, cf, can_atk_after)
+                if mv_sc > best_score + 0.5:
+                    best_score = mv_sc
+                    best_cf = cf
+                    best_dest = dest
+
+        if best_cf != unit.facing and rotate_unit(state, unit.unit_id, best_cf):
+            return AIActionRecord(
+                action_type="rotate",
+                unit_id=unit.unit_id,
+                unit_name=unit.spec.name,
+                new_facing=best_cf,
+                description=f"Enemy {unit.spec.name} rotated to {ABS_FACING_NAMES[best_cf]}.",
+            )
+
+        if best_dest != unit.hex_pos and move_unit(state, unit.unit_id, best_dest):
+            return AIActionRecord(
+                action_type="move",
+                unit_id=unit.unit_id,
+                unit_name=unit.spec.name,
+                target_hex=best_dest,
+                description=f"Enemy {unit.spec.name} moved to {best_dest}.",
+            )
+
+        state.ai_acted_unit_ids.add(unit.unit_id)
+
+    # All living enemy units have completed their actions -> end the enemy turn
+    end_turn(state)
+    return AIActionRecord(
+        action_type="end_turn",
+        unit_id=None,
+        description=f"Enemy turn complete — Turn {state.turn_number} (YOUR TURN).",
+    )
+
+
+def run_enemy_turn(state: GameState, max_actions: int = 250) -> List[AIActionRecord]:
+    """
+    Execute the entire Enemy Mammal turn synchronously until control returns to
+    `TEAM_PLAYER` or the battle concludes (`PHASE_EVOLUTION` or `PHASE_DEFEAT`).
+    """
+    records: List[AIActionRecord] = []
+    for _ in range(max_actions):
+        if state.phase != PHASE_BATTLE or state.active_team != TEAM_ENEMY:
+            break
+        rec = execute_next_ai_action(state)
+        if rec is None:
+            break
+        records.append(rec)
+        if rec.action_type == "end_turn":
+            break
+    return records
 
 
 def cycle_unit_stage(state: GameState, unit_id: str, delta: int) -> bool:

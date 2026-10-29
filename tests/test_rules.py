@@ -245,6 +245,24 @@ def test_flying_over_opponent_requires_empty_landing_hex() -> None:
     assert not rules.is_unit_overlapping(state, "flyer")
     assert rules.can_end_turn(state)
 
+    # Now test that if ALL reachable landing hexes beyond an occupied hex are ALSO occupied,
+    # the rules layer prevents the flyer from moving onto the occupied hex at all.
+    state2 = rules.GameState(arena_radius=4)
+    # Place flyer at (0, 4) facing S (toward edge of radius-4 board so (0, 4) has no S neighbor;
+    # Wait: let's place flyer at (0, -3) facing N (0), where (0, -4) is the northernmost board edge hex!
+    # If (0, -4) is occupied by a blocker, and all valid hexes reachable in 1 step from (0, -4)
+    # are also occupied, then flying onto (0, -4) has NO empty landing hex!)
+    flyer2 = rules.Unit("flyer2", jaculus_spec, rules.TEAM_PLAYER, (0, -3), rules.FACING_N)
+    state2.units["flyer2"] = flyer2
+    # Block (0, -4) and every valid neighbor of (0, -4): (1, -4), (1, -3), (0, -3), (-1, -3)
+    for idx, coord in enumerate([(0, -4), (1, -4), (1, -3), (-1, -3)]):
+        state2.units[f"blk_{idx}"] = rules.Unit(
+            f"blk_{idx}", rat_spec, rules.TEAM_ENEMY, coord, rules.FACING_S
+        )
+    # Because there is no empty hex reachable from (0, -4) on Step 2, (0, -4) MUST NOT be a legal move!
+    assert (0, -4) not in rules.get_legal_moves(state2, "flyer2")
+    assert not rules.move_unit(state2, "flyer2", (0, -4))
+
 
 def test_initial_game_state_army_and_round1_rats_wave() -> None:
     """
@@ -440,7 +458,7 @@ def test_multi_arc_cleave_and_slaying_mammals_across_turns() -> None:
     Player units can execute juncture attacks across turns (end_turn refreshes player units
     while enemy_ai_enabled is False) and slay all enemy mammals.
     """
-    state = rules.GameState(arena_radius=4)
+    state = rules.GameState(arena_radius=4, enemy_ai_enabled=False)
     adder_spec = rules.get_creature_spec(rules.CLASS_SERPENT, 1)  # ATK 5, DEF 1, HP 8
     rat_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 1)     # ATK 4, DEF 1, HP 8
 
@@ -567,6 +585,89 @@ def test_evolution_phase_pairs_vs_single_and_next_round_reinforcements() -> None
         assert rrec.leveled_up is True
         assert rrec.old_spec.stage == 1
         assert rrec.new_spec.stage == 2
+
+
+def test_enemy_mammal_ai_advances_attacks_and_ends_turn() -> None:
+    """
+    With `enemy_ai_enabled=True`, `end_turn` passes control to `TEAM_ENEMY`,
+    `run_enemy_turn` advances and attacks using shared `rules.py` helpers,
+    and finishes by returning control to `TEAM_PLAYER` on `turn_number == 2`.
+    """
+    state = rules.GameState(arena_radius=4, enemy_ai_enabled=True)
+    pond_spec = rules.get_creature_spec(rules.CLASS_TURTLE, 1)  # HP 12, ATK 3, DEF 3
+    rat_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 1)   # HP 8, ATK 4, DEF 1
+
+    # Player Pond Turtle at (0, 1) facing N; Enemy Rat 2 hexes north at (0, -1) facing S
+    turtle = rules.Unit("t1", pond_spec, rules.TEAM_PLAYER, (0, 1), rules.FACING_N)
+    rat = rules.Unit("r1", rat_spec, rules.TEAM_ENEMY, (0, -1), rules.FACING_S)
+    state.units = {"t1": turtle, "r1": rat}
+
+    # Player ends Turn 1 -> switches active_team to TEAM_ENEMY
+    assert rules.end_turn(state)
+    assert state.active_team == rules.TEAM_ENEMY
+    assert state.turn_number == 1
+
+    # Run the Enemy Mammal AI turn: Rat moves south from (0, -1) to (0, 0), attacks Turtle, and ends turn
+    ai_records = rules.run_enemy_turn(state)
+    action_types = [r.action_type for r in ai_records]
+    assert "move" in action_types
+    assert "attack" in action_types
+    assert action_types[-1] == "end_turn"
+    assert rat.hex_pos == (0, 0)
+    assert turtle.hp < turtle.max_hp
+    assert state.active_team == rules.TEAM_PLAYER
+    assert state.turn_number == 2
+
+
+def test_enemy_mammal_ai_flying_griffon_crosses_blocker_and_lands_empty() -> None:
+    """
+    A flying Enemy Mammal (Griffon, `num_rotate_moves=2, can_fly=True`) uses shared flight
+    rules to fly over an intervening blocker onto an empty landing hex adjacent to a player
+    reptile, attacks, and ends its turn on an empty hex (`can_end_turn(state) is True`).
+    """
+    state = rules.GameState(arena_radius=4, active_team=rules.TEAM_ENEMY, enemy_ai_enabled=True)
+    griffon_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 5)  # num_rotate_moves=2, can_fly=True
+    rat_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 1)
+    turtle_spec = rules.get_creature_spec(rules.CLASS_TURTLE, 4)   # Tortoise HP 25
+
+    # Griffon at (0, -1) facing S; allied Rat blocking (0, 0); player Tortoise at (0, 2)
+    # Empty hex (0, 1) is directly between the blocker at (0, 0) and Tortoise at (0, 2)
+    griffon = rules.Unit("g1", griffon_spec, rules.TEAM_ENEMY, (0, -1), rules.FACING_S)
+    blocker = rules.Unit("b1", rat_spec, rules.TEAM_ENEMY, (0, 0), rules.FACING_S)
+    # Prevent blocker from moving first by marking it acted
+    state.ai_acted_unit_ids.add("b1")
+    tortoise = rules.Unit("t1", turtle_spec, rules.TEAM_PLAYER, (0, 2), rules.FACING_N)
+    state.units = {"g1": griffon, "b1": blocker, "t1": tortoise}
+
+    records = rules.run_enemy_turn(state)
+    assert griffon.hex_pos == (0, 1)
+    assert not rules.is_unit_overlapping(state, "g1")
+    assert tortoise.hp < tortoise.max_hp
+    assert state.active_team == rules.TEAM_PLAYER
+    assert any(r.action_type == "attack" for r in records)
+
+
+def test_defeat_phase_when_all_player_reptiles_slain() -> None:
+    """
+    When the Enemy Mammal AI slays the last remaining player reptile, `are_all_players_slain`
+    becomes True and `state.phase` transitions to `PHASE_DEFEAT`.
+    """
+    state = rules.GameState(arena_radius=4, active_team=rules.TEAM_ENEMY, enemy_ai_enabled=True)
+    adder_spec = rules.get_creature_spec(rules.CLASS_SERPENT, 1)
+    bear_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 3)  # ATK 7
+
+    # 1-HP Adder at (0, 1) facing N; Bear at (0, 0) facing S
+    adder = rules.Unit("a1", adder_spec, rules.TEAM_PLAYER, (0, 1), rules.FACING_N, hp=1)
+    bear = rules.Unit("bear", bear_spec, rules.TEAM_ENEMY, (0, 0), rules.FACING_S)
+    state.units = {"a1": adder, "bear": bear}
+
+    records = rules.run_enemy_turn(state)
+    assert len(records) >= 1
+    assert records[0].action_type == "attack"
+    assert not adder.is_alive
+    assert rules.are_all_players_slain(state)
+    assert state.phase == rules.PHASE_DEFEAT
+
 
 
 
