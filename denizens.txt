@@ -198,7 +198,9 @@ Turtle 8-Stage Lineup:
                                clockwise within max_rotate_per_move.
   - Right-Click Adjacent Hex : Rotate selected unit toward an adjacent hex.
   - Left-Click Highlight Hex : Move selected unit into a legal destination hex
-                               (green = empty hex, cyan = fly-over occupied hex).
-  - F Key                    : Execute/test attack at current juncture
-                               (BEFORE_ROTATE / AFTER_ROTATE / AFTER_MOVE).
-  - Space Key                : End current team's turn.
+                               (green = empty hex, cyan = fly-over occupied hex)
+                               or attack an enemy on a crimson target hex.
+  - F Key                    : Execute attack against enemy in attack arc at
+                               current juncture (BEFORE_ROTATE / AFTER_ROTATE /
+                               AFTER_MOVE).
+  - Space Key                : End current combat turn.

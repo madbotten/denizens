@@ -90,7 +90,7 @@ class AssetCache:
 
 
 # ============================================================================
-# UI Button Model
+# UI Button & Floating Combat Callout Models
 # ============================================================================
 
 @dataclass
@@ -100,6 +100,16 @@ class UIButton:
     action_id: str
     enabled: bool = True
     accent_color: Tuple[int, int, int] = (75, 92, 115)
+
+
+@dataclass
+class CombatCallout:
+    hex_pos: hexgrid.HexCoord
+    text: str
+    color: Tuple[int, int, int]
+    frames_left: int = 75
+    max_frames: int = 75
+    y_offset: float = 0.0
 
 
 # ============================================================================
@@ -124,6 +134,27 @@ class BattleRenderer:
         self.font_badge = pygame.font.SysFont("menlo", 13, bold=True)
 
         self.buttons: List[UIButton] = []
+        self.callouts: List[CombatCallout] = []
+
+    def add_attack_callouts(self, results: List[rules.AttackResult]) -> None:
+        """Spawn floating damage/status callouts for each target struck in an attack."""
+        for idx, res in enumerate(results):
+            vuln_tag = " (VULN!)" if res.is_vulnerable else ""
+            slain_tag = " — SLAIN!" if res.defender_slain else ""
+            txt = f"-{res.damage} HP{vuln_tag}{slain_tag}"
+            col = (
+                C.COLOR_TEXT_GOLD
+                if (res.defender_slain or res.is_vulnerable)
+                else C.COLOR_TEXT_RED
+            )
+            self.callouts.append(
+                CombatCallout(
+                    hex_pos=res.target_hex,
+                    text=txt,
+                    color=col,
+                    y_offset=-18.0 * idx,
+                )
+            )
 
     # ------------------------------------------------------------------------
     # Reserve Slot Geometry (2 columns x 8 rows = 16 slots)
@@ -351,6 +382,11 @@ class BattleRenderer:
         attack_arc_hexes: List[hexgrid.HexCoord] = (
             rules.get_attack_arc_hexes(state, sel_deployed.unit_id) if sel_deployed else []
         )
+        legal_attack_targets: List[hexgrid.HexCoord] = (
+            rules.get_legal_attack_targets(state, sel_deployed.unit_id)
+            if sel_deployed
+            else []
+        )
 
         is_setup = state.phase == C.PHASE_SETUP
 
@@ -378,7 +414,10 @@ class BattleRenderer:
             pygame.draw.polygon(self.screen, fill_col, pts)
             pygame.draw.polygon(self.screen, border_col, pts, width=2)
 
-            if coord in attack_arc_hexes:
+            if coord in legal_attack_targets and sel_deployed is not None:
+                atk_pts = self.camera.hex_polygon_points(coord, scale=0.86)
+                pygame.draw.polygon(self.screen, C.COLOR_ATTACK_ARC, atk_pts, width=4)
+            elif coord in attack_arc_hexes:
                 inner_pts = self.camera.hex_polygon_points(coord, scale=0.88)
                 pygame.draw.polygon(self.screen, C.COLOR_ATTACK_ARC, inner_pts, width=2)
 
@@ -493,10 +532,42 @@ class BattleRenderer:
                 )
 
                 if self.camera.zoom >= 0.65:
-                    lbl = self.font_small.render(unit.spec.name, True, C.COLOR_TEXT_MAIN)
+                    # Unit HP Bar
+                    bar_w = 54
+                    bar_h = 6
+                    bx = int(ux - bar_w * 0.5)
+                    by = int(uy + self.camera.hex_radius * 0.42)
+                    hp_ratio = max(0.0, min(1.0, unit.hp / max(1, unit.spec.max_hp)))
+                    fill_w = int(round(bar_w * hp_ratio))
+                    hp_col = (
+                        (70, 215, 115)
+                        if unit.team == C.TEAM_PLAYER
+                        else (230, 85, 75)
+                    )
+                    pygame.draw.rect(
+                        self.screen, (18, 20, 26), pygame.Rect(bx, by, bar_w, bar_h), border_radius=3
+                    )
+                    if fill_w > 0:
+                        pygame.draw.rect(
+                            self.screen,
+                            hp_col,
+                            pygame.Rect(bx, by, fill_w, bar_h),
+                            border_radius=3,
+                        )
+                    pygame.draw.rect(
+                        self.screen,
+                        (75, 85, 98),
+                        pygame.Rect(bx, by, bar_w, bar_h),
+                        width=1,
+                        border_radius=3,
+                    )
+
+                    # Unit Name & HP Label
+                    lbl_str = f"{unit.spec.name} ({unit.hp})"
+                    lbl = self.font_tiny.render(lbl_str, True, C.COLOR_TEXT_MAIN)
                     bg_rect = pygame.Rect(
                         int(ux - lbl.get_width() * 0.5 - 4),
-                        int(uy + self.camera.hex_radius * 0.52),
+                        by + bar_h + 2,
                         lbl.get_width() + 8,
                         lbl.get_height() + 2,
                     )
@@ -505,6 +576,53 @@ class BattleRenderer:
                         self.screen, ring_col, bg_rect, width=1, border_radius=4
                     )
                     self.screen.blit(lbl, (bg_rect.x + 4, bg_rect.y + 1))
+
+                # If this unit is a legal attack target for the selected unit right now, show attack preview badge
+                if (
+                    coord in legal_attack_targets
+                    and sel_deployed is not None
+                    and unit.team != sel_deployed.team
+                ):
+                    dmg, _, is_vuln, _ = rules.compute_attack_damage(
+                        state, sel_deployed, unit
+                    )
+                    atk_tag = f"ATK -{dmg} HP{' (VULN!)' if is_vuln else ''}"
+                    atk_surf = self.font_badge.render(atk_tag, True, (255, 235, 195))
+                    tag_rect = pygame.Rect(
+                        int(ux - atk_surf.get_width() * 0.5 - 6),
+                        int(uy - self.camera.hex_radius * 0.72),
+                        atk_surf.get_width() + 12,
+                        atk_surf.get_height() + 4,
+                    )
+                    pygame.draw.rect(
+                        self.screen, (155, 38, 38), tag_rect, border_radius=5
+                    )
+                    pygame.draw.rect(
+                        self.screen, C.COLOR_TEXT_GOLD, tag_rect, width=1, border_radius=5
+                    )
+                    self.screen.blit(atk_surf, (tag_rect.x + 6, tag_rect.y + 2))
+
+        # 4. Draw floating combat callouts
+        active_callouts: List[CombatCallout] = []
+        for callout in self.callouts:
+            cx, cy = self.camera.hex_to_pixel(callout.hex_pos)
+            progress = 1.0 - (callout.frames_left / max(1, callout.max_frames))
+            float_y = cy - self.camera.hex_radius * 0.55 - progress * 34.0 + callout.y_offset
+            surf = self.font_badge.render(callout.text, True, callout.color)
+            bg_r = pygame.Rect(
+                int(cx - surf.get_width() * 0.5 - 6),
+                int(float_y - surf.get_height() * 0.5 - 2),
+                surf.get_width() + 12,
+                surf.get_height() + 4,
+            )
+            pygame.draw.rect(self.screen, (16, 18, 24), bg_r, border_radius=5)
+            pygame.draw.rect(self.screen, callout.color, bg_r, width=1, border_radius=5)
+            self.screen.blit(surf, (bg_r.x + 6, bg_r.y + 2))
+
+            callout.frames_left -= 1
+            if callout.frames_left > 0:
+                active_callouts.append(callout)
+        self.callouts = active_callouts
 
         self.draw_viewport_hud(state, status_message)
         self.screen.set_clip(None)
@@ -532,20 +650,33 @@ class BattleRenderer:
                 "Wheel / Q-E / Left-Right: Rotate  |  Enter: Confirm Deployment"
             )
         else:
-            team_col = (
-                C.COLOR_TEXT_GREEN
-                if state.active_team == C.TEAM_PLAYER
-                else C.COLOR_TEXT_RED
+            enemies_alive = sum(
+                1
+                for u in state.units.values()
+                if u.is_alive and u.team == C.TEAM_ENEMY
             )
-            header_txt = (
-                f"ROUND {state.round_number}  •  TURN {state.turn_number}  •  "
-                f"ACTIVE TEAM: {state.active_team.upper()}  •  "
-                f"WAVE BUDGET: {state.wave_budget} PTS"
-            )
-            header_col = team_col
+            if enemies_alive == 0:
+                header_txt = (
+                    f"ROUND {state.round_number} VICTORY!   •   "
+                    f"ALL ENEMY MAMMALS SLAIN IN {state.turn_number} TURNS!"
+                )
+                header_col = C.COLOR_TEXT_GOLD
+            else:
+                team_col = (
+                    C.COLOR_TEXT_GREEN
+                    if state.active_team == C.TEAM_PLAYER
+                    else C.COLOR_TEXT_RED
+                )
+                header_txt = (
+                    f"ROUND {state.round_number}  •  TURN {state.turn_number}  •  "
+                    f"ACTIVE TEAM: {state.active_team.upper()}  •  "
+                    f"ENEMY MAMMALS ALIVE: {enemies_alive}"
+                )
+                header_col = team_col
             controls_txt = (
-                "L-Click: Select/Move  |  Wheel / Left-Right / Q-E / R-Click Adj Hex: Rotate  |  "
-                "F: Attack  |  Space: End Turn"
+                "L-Click: Select / Move / Attack Red Target Hex  |  "
+                "Wheel / Left-Right / Q-E / R-Click Adj Hex: Rotate  |  "
+                "F: Attack  |  Space: Next Combat Turn"
             )
 
         header = self.font_subtitle.render(header_txt, True, header_col)
@@ -680,6 +811,8 @@ class BattleRenderer:
         )
 
         can_atk = rules.can_unit_attack_now(state, unit.unit_id)
+        atk_targets = rules.get_legal_attack_targets(state, unit.unit_id)
+        can_exec_atk = len(atk_targets) > 0
         legal_rots = rules.get_legal_rotations(state, unit.unit_id)
         legal_mvs = rules.get_legal_moves(state, unit.unit_id)
 
@@ -703,8 +836,8 @@ class BattleRenderer:
             ),
             (
                 f"Attacks Used: {unit.attacks_used}/{spec.total_attacks_per_move}  •  "
-                f"Can Attack ({unit.juncture}): {'YES' if can_atk else 'NO'}",
-                C.COLOR_TEXT_GREEN if can_atk else C.COLOR_TEXT_MUTED,
+                f"Juncture Ready: {'YES' if can_atk else 'NO'}  •  Targets in Arc: {len(atk_targets)}",
+                C.COLOR_TEXT_GREEN if can_exec_atk else C.COLOR_TEXT_MUTED,
             ),
             (
                 pos_str,
@@ -825,7 +958,7 @@ class BattleRenderer:
                     pygame.Rect(x0, row2_y, btn_w, btn_h),
                     f"Attack ({unit.juncture[:10]}) [F]",
                     "juncture_attack",
-                    enabled=can_atk,
+                    enabled=can_exec_atk,
                     accent_color=(165, 70, 65),
                 )
             )

@@ -54,6 +54,21 @@ class DenizensApp:
             "Round 1 Setup: Drag all 6 reptiles from the Left Reserve onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
         )
 
+    def _report_attack_results(self, results: List[rules.AttackResult]) -> None:
+        self.renderer.add_attack_callouts(results)
+        parts: List[str] = []
+        for res in results:
+            arc_name = C.REL_DIR_NAMES[res.incoming_rel_dir]
+            vuln_str = f" [{arc_name.upper()} VULNERABLE!]" if res.is_vulnerable else f" [{arc_name}]"
+            slain_str = " — SLAIN!" if res.defender_slain else ""
+            parts.append(
+                f"{res.attacker_name} hit {res.defender_name} for {res.damage} dmg{vuln_str}{slain_str}"
+            )
+        summary = "  |  ".join(parts)
+        if rules.are_all_enemies_slain(self.state):
+            summary += "   *** VICTORY! All Enemy Mammals Slain! ***"
+        self.status_message = summary
+
     def _in_map_viewport(self, mx: int) -> bool:
         if self.state.phase == C.PHASE_SETUP:
             return C.MAP_VIEWPORT_X <= mx < C.SIDEBAR_X
@@ -108,19 +123,24 @@ class DenizensApp:
                 )
 
         elif action_id == "juncture_attack" and sel_id:
-            u = self.state.get_unit(sel_id)
-            if u and rules.record_juncture_attack(self.state, sel_id):
-                self.status_message = (
-                    f"{u.spec.name} executed attack at {u.juncture} "
-                    f"({u.attacks_used}/{u.spec.total_attacks_per_move} used)."
-                )
+            results = rules.execute_attack(self.state, sel_id)
+            if results:
+                self._report_attack_results(results)
             else:
-                self.status_message = "Cannot attack at this juncture (already attacked or limit reached)."
+                self.status_message = (
+                    "Cannot attack right now (need an enemy in attack arc and an available attack at this juncture)."
+                )
 
         elif action_id == "end_turn":
             if rules.end_turn(self.state):
+                enemies_left = sum(
+                    1
+                    for u in self.state.units.values()
+                    if u.is_alive and u.team == C.TEAM_ENEMY
+                )
                 self.status_message = (
-                    f"Turn {self.state.turn_number} — Active Team: {self.state.active_team.upper()}"
+                    f"Combat Turn {self.state.turn_number} — All player units refreshed! "
+                    f"({enemies_left} enemy mammals remaining)"
                 )
             else:
                 self.status_message = "Cannot end turn while a flying creature is overlapping another unit!"
@@ -182,6 +202,15 @@ class DenizensApp:
 
         # PHASE_BATTLE left click
         sel_id = self.state.selected_unit_id
+        legal_atk_targets = (
+            rules.get_legal_attack_targets(self.state, sel_id) if sel_id else []
+        )
+        if sel_id and clicked_hex in legal_atk_targets:
+            results = rules.execute_attack(self.state, sel_id, clicked_hex)
+            if results:
+                self._report_attack_results(results)
+                return
+
         legal_moves = rules.get_legal_moves(self.state, sel_id) if sel_id else []
 
         if sel_id and clicked_hex in legal_moves:

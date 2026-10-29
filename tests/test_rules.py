@@ -352,3 +352,92 @@ def test_wave_points_basic_adaptive_vs_advanced_schedule() -> None:
     assert 1 <= len(wave) <= rules.MAX_ARMY_SIZE
     assert sum(s.point_cost for s in wave) <= 85
 
+
+def test_directional_combat_front_flank_rear_vulnerability() -> None:
+    """
+    Attacking into a defender's FRONT deals base damage (ATK - DEF), while attacking
+    into FLANK_LEFT / FLANK_RIGHT (+2) or REAR (+3) in defender.spec.vulnerable_arcs
+    grants directional vulnerability bonus damage. Armored turtles ignore flank/rear bonuses.
+    """
+    state = rules.GameState(arena_radius=4)
+    adder_spec = rules.get_creature_spec(rules.CLASS_SERPENT, 1)  # ATK 5, DEF 1, HP 8
+    rat_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 1)     # ATK 4, DEF 1, HP 8
+    war_turtle_spec = rules.get_creature_spec(rules.CLASS_TURTLE, 7)  # vulnerable_arcs = empty
+
+    # Defender Rat at (0, 0) facing South (3):
+    # - Hex (0, 1) [dir 3 = S] is in front of Rat (FORWARD = 0)
+    # - Hex (1, -1) [dir 1 = NE] is to Rat's FLANK_LEFT ((1 - 3) % 6 == 4)
+    # - Hex (0, -1) [dir 0 = N] is to Rat's REAR ((0 - 3) % 6 == 3)
+    rat = rules.Unit("rat", rat_spec, rules.TEAM_ENEMY, (0, 0), rules.FACING_S)
+    atk_front = rules.Unit("a_front", adder_spec, rules.TEAM_PLAYER, (0, 1), rules.FACING_N)
+    atk_flank = rules.Unit("a_flank", adder_spec, rules.TEAM_PLAYER, (1, -1), rules.FACING_SW)
+    atk_rear = rules.Unit("a_rear", adder_spec, rules.TEAM_PLAYER, (0, -1), rules.FACING_S)
+
+    state.units = {
+        "rat": rat,
+        "a_front": atk_front,
+        "a_flank": atk_flank,
+        "a_rear": atk_rear,
+    }
+
+    dmg_front, rel_front, vuln_front, _ = rules.compute_attack_damage(state, atk_front, rat)
+    assert rel_front == rules.FORWARD
+    assert vuln_front is False
+    assert dmg_front == 5 - 1 == 4
+
+    dmg_flank, rel_flank, vuln_flank, _ = rules.compute_attack_damage(state, atk_flank, rat)
+    assert rel_flank == rules.FLANK_LEFT
+    assert vuln_flank is True
+    assert dmg_flank == (5 - 1) + 2 == 6
+
+    dmg_rear, rel_rear, vuln_rear, _ = rules.compute_attack_damage(state, atk_rear, rat)
+    assert rel_rear == rules.REAR
+    assert vuln_rear is True
+    assert dmg_rear == (5 - 1) + 3 == 7
+
+    # War Turtle has vulnerable_arcs = frozenset(), so rear attacks get no vulnerability bonus
+    wt = rules.Unit("wt", war_turtle_spec, rules.TEAM_ENEMY, (0, 0), rules.FACING_S)
+    state.units["wt"] = wt
+    _, rel_wt, vuln_wt, _ = rules.compute_attack_damage(state, atk_rear, wt)
+    assert rel_wt == rules.REAR
+    assert vuln_wt is False
+
+
+def test_multi_arc_cleave_and_slaying_mammals_across_turns() -> None:
+    """
+    Player units can execute juncture attacks across turns (end_turn refreshes player units
+    while enemy_ai_enabled is False) and slay all enemy mammals.
+    """
+    state = rules.GameState(arena_radius=4)
+    adder_spec = rules.get_creature_spec(rules.CLASS_SERPENT, 1)  # ATK 5, DEF 1, HP 8
+    rat_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 1)     # ATK 4, DEF 1, HP 8
+
+    adder = rules.Unit("adder", adder_spec, rules.TEAM_PLAYER, (0, 1), rules.FACING_N)
+    rat = rules.Unit("rat", rat_spec, rules.TEAM_ENEMY, (0, 0), rules.FACING_S)
+    state.units = {"adder": adder, "rat": rat}
+
+    # Turn 1: Adder attacks Rat from the front for 4 dmg (Rat HP: 8 -> 4)
+    assert rules.get_legal_attack_targets(state, "adder") == [(0, 0)]
+    res1 = rules.execute_attack(state, "adder", (0, 0))
+    assert len(res1) == 1
+    assert res1[0].damage == 4
+    assert not res1[0].defender_slain
+    assert rat.hp == 4
+    assert not rules.can_unit_attack_now(state, "adder")
+    assert not rules.are_all_enemies_slain(state)
+
+    # End Turn -> advances to Turn 2, keeps active_team == TEAM_PLAYER, refreshes Adder
+    assert rules.end_turn(state)
+    assert state.turn_number == 2
+    assert state.active_team == rules.TEAM_PLAYER
+    assert rules.can_unit_attack_now(state, "adder")
+
+    # Turn 2: Adder attacks Rat again for 4 dmg -> Rat is slain (HP 0, hex_pos None)
+    res2 = rules.execute_attack(state, "adder", (0, 0))
+    assert len(res2) == 1
+    assert res2[0].defender_slain is True
+    assert not rat.is_alive
+    assert rat.hex_pos is None
+    assert rules.are_all_enemies_slain(state)
+
+

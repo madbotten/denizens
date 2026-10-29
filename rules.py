@@ -108,6 +108,7 @@ class Unit:
     step_start_facing: int = 0
     attacks_used: int = 0
     attacked_at_current_juncture: bool = False
+    poison_stacks: int = 0
 
     def __post_init__(self) -> None:
         self.facing = self.facing % 6
@@ -159,6 +160,22 @@ class EvolutionRecord:
 
 
 @dataclass
+class AttackResult:
+    """Records the outcome of a directional melee/breath attack against a single target."""
+    attacker_id: str
+    attacker_name: str
+    defender_id: str
+    defender_name: str
+    target_hex: HexCoord
+    damage: int
+    incoming_rel_dir: int
+    is_vulnerable: bool
+    defender_slain: bool
+    retaliation_damage: int = 0
+    notes: List[str] = field(default_factory=list)
+
+
+@dataclass
 class GameState:
     """Complete state of a Denizens tactical battle and persistent army."""
     arena_radius: int = ARENA_RADIUS
@@ -173,7 +190,9 @@ class GameState:
     max_army_size: int = MAX_ARMY_SIZE
     reinforcements_per_round: int = REINFORCEMENTS_BASE
     next_unit_seq: int = 1
+    enemy_ai_enabled: bool = False
     evolution_records: List[EvolutionRecord] = field(default_factory=list)
+    last_attack_results: List[AttackResult] = field(default_factory=list)
 
     def get_unit(self, unit_id: Optional[str]) -> Optional[Unit]:
         if unit_id is None:
@@ -926,6 +945,117 @@ def get_attack_arc_hexes(state: GameState, unit_id: str) -> List[HexCoord]:
     return hexes
 
 
+def get_legal_attack_targets(state: GameState, attacker_id: str) -> List[HexCoord]:
+    """
+    Return all adjacent hex coordinates in `attacker_id`'s `attack_arcs` that contain a living
+    opposing unit and can be attacked right now at the current juncture.
+    """
+    if not can_unit_attack_now(state, attacker_id):
+        return []
+    attacker = state.get_unit(attacker_id)
+    if attacker is None or attacker.hex_pos is None:
+        return []
+
+    targets: List[HexCoord] = []
+    for arc_hex in get_attack_arc_hexes(state, attacker_id):
+        occupant = state.get_unit_at_hex(arc_hex, exclude_unit_id=attacker_id)
+        if occupant is not None and occupant.team != attacker.team:
+            targets.append(arc_hex)
+    return targets
+
+
+def can_execute_attack(state: GameState, attacker_id: str) -> bool:
+    """Return True if `attacker_id` can attack at the current juncture AND has at least 1 enemy in arc."""
+    return len(get_legal_attack_targets(state, attacker_id)) > 0
+
+
+# Special power sets for combat resolution
+_ARMOR_PIERCE_POWERS: Set[str] = {
+    "serrated_bite",
+    "rending_fangs",
+    "crushing_bite",
+    "snapping_jaws",
+    "maul",
+}
+_CHARGE_POWERS: Set[str] = {
+    "winged_javelin",
+    "pounce",
+    "diving_talons",
+    "predator_sprint",
+    "gore_charge",
+}
+_CLEAVE_POWERS: Set[str] = {
+    "draconic_sweep",
+    "multi_headed_strike",
+    "fire_breath",
+    "steam_breath",
+    "tempest_fury",
+    "hellfire_breath",
+    "twin_heads",
+}
+
+
+def compute_attack_damage(
+    state: GameState, attacker: Unit, defender: Unit
+) -> Tuple[int, int, bool, List[str]]:
+    """
+    Calculate directional combat damage when `attacker` strikes `defender`.
+    Returns `(damage, incoming_rel_dir_on_defender, is_vulnerable, modifier_notes)`.
+    """
+    assert attacker.hex_pos is not None and defender.hex_pos is not None
+    incoming_abs = hex_direction_between(defender.hex_pos, attacker.hex_pos)
+    incoming_rel = (
+        relative_direction(defender.facing, incoming_abs)
+        if incoming_abs is not None
+        else FORWARD
+    )
+    is_vulnerable = incoming_rel in defender.spec.vulnerable_arcs
+
+    notes: List[str] = []
+    atk_powers = set(attacker.spec.special_powers)
+
+    eff_def = defender.spec.defense
+    if atk_powers & _ARMOR_PIERCE_POWERS:
+        eff_def = max(0, eff_def - 2)
+        notes.append("Armor Pierce")
+
+    dmg = max(1, attacker.spec.attack - eff_def)
+
+    if is_vulnerable:
+        if incoming_rel == REAR:
+            dmg += 3
+            notes.append("Rear Vulnerable (+3)")
+        else:
+            dmg += 2
+            notes.append("Flank Vulnerable (+2)")
+
+    if (atk_powers & _CHARGE_POWERS) and (
+        attacker.juncture == JUNCTURE_AFTER_MOVE or attacker.current_step > 0
+    ):
+        dmg += 2
+        notes.append("Charge (+2)")
+
+    if "venom_fangs" in atk_powers or "lethal_venom" in atk_powers:
+        dmg += 1
+        notes.append("Venom (+1)")
+
+    if "constrict" in atk_powers or "petrifying_gaze" in atk_powers:
+        dmg += 2
+        notes.append("Special (+2)")
+
+    if "pack_tactics" in atk_powers or "alpha_howl" in atk_powers:
+        # Bonus if another allied unit is adjacent to defender
+        for d in range(6):
+            adj = hex_neighbor(defender.hex_pos, d)
+            ally = state.get_unit_at_hex(adj, exclude_unit_id=attacker.unit_id)
+            if ally is not None and ally.team == attacker.team:
+                dmg += 2
+                notes.append("Pack Tactics (+2)")
+                break
+
+    return (dmg, incoming_rel, is_vulnerable, notes)
+
+
 def record_juncture_attack(state: GameState, unit_id: str) -> bool:
     """
     Mark that `unit_id` has used an attack at its current juncture.
@@ -940,6 +1070,96 @@ def record_juncture_attack(state: GameState, unit_id: str) -> bool:
     return True
 
 
+def execute_attack(
+    state: GameState, attacker_id: str, target_hex: Optional[HexCoord] = None
+) -> List[AttackResult]:
+    """
+    Execute an attack by `attacker_id` at its current juncture (`BEFORE_ROTATE`,
+    `AFTER_ROTATE`, or `AFTER_MOVE`) against `target_hex` (or the first legal target
+    in its `attack_arcs` if `target_hex` is None).
+    Creatures with multi-arc cleave/breath powers strike all enemies currently in their `attack_arcs`.
+    """
+    legal_targets = get_legal_attack_targets(state, attacker_id)
+    if not legal_targets:
+        return []
+    if target_hex is not None and target_hex not in legal_targets:
+        return []
+
+    attacker = state.get_unit(attacker_id)
+    if attacker is None or attacker.hex_pos is None:
+        return []
+
+    atk_powers = set(attacker.spec.special_powers)
+    if atk_powers & _CLEAVE_POWERS:
+        # Strike all legal targets in attack_arcs, putting the clicked target_hex first
+        if target_hex is not None:
+            struck_hexes = [target_hex] + [h for h in legal_targets if h != target_hex]
+        else:
+            struck_hexes = list(legal_targets)
+    else:
+        struck_hexes = [target_hex if target_hex is not None else legal_targets[0]]
+
+    if not record_juncture_attack(state, attacker_id):
+        return []
+
+    results: List[AttackResult] = []
+    for t_hex in struck_hexes:
+        defender = state.get_unit_at_hex(t_hex, exclude_unit_id=attacker_id)
+        if defender is None or defender.team == attacker.team:
+            continue
+
+        dmg, incoming_rel, is_vuln, notes = compute_attack_damage(
+            state, attacker, defender
+        )
+        defender.hp = max(0, defender.hp - dmg)
+
+        if "lethal_venom" in atk_powers:
+            defender.poison_stacks += 2
+        elif "venom_fangs" in atk_powers:
+            defender.poison_stacks += 1
+
+        defender_slain = defender.hp <= 0
+        if defender_slain:
+            defender.hex_pos = None
+
+        ret_dmg = 0
+        def_powers = set(defender.spec.special_powers)
+        if "molten_carapace" in def_powers:
+            ret_dmg = 2
+        elif "thorny_hide" in def_powers or "spiked_ridge" in def_powers:
+            ret_dmg = 1
+
+        if ret_dmg > 0 and attacker.is_alive:
+            attacker.hp = max(0, attacker.hp - ret_dmg)
+            notes.append(f"Thorns (-{ret_dmg} HP)")
+            if attacker.hp <= 0:
+                attacker.hex_pos = None
+
+        results.append(
+            AttackResult(
+                attacker_id=attacker.unit_id,
+                attacker_name=attacker.spec.name,
+                defender_id=defender.unit_id,
+                defender_name=defender.spec.name,
+                target_hex=t_hex,
+                damage=dmg,
+                incoming_rel_dir=incoming_rel,
+                is_vulnerable=is_vuln,
+                defender_slain=defender_slain,
+                retaliation_damage=ret_dmg,
+                notes=notes,
+            )
+        )
+
+    state.last_attack_results = results
+    return results
+
+
+def are_all_enemies_slain(state: GameState) -> bool:
+    """Return True if no living enemy Mammal units remain in the battle."""
+    return not any(u.is_alive and u.team == TEAM_ENEMY for u in state.units.values())
+
+
 def can_end_turn(state: GameState) -> bool:
     """Return True if in PHASE_BATTLE and no unit is currently mid-flight overlapping another unit."""
     if state.phase != PHASE_BATTLE:
@@ -952,21 +1172,36 @@ def can_end_turn(state: GameState) -> bool:
 
 def end_turn(state: GameState) -> bool:
     """
-    Advance the active team turn and reset turn counters for all living units.
+    Advance the combat turn and reset turn counters for all living units.
+    When `state.enemy_ai_enabled` is False (Phase 3), keeps `active_team = TEAM_PLAYER`
+    and increments `turn_number` so the player can attack and slay the mammals across turns.
     Returns False if a flying unit is still overlapping another unit's hex.
     """
     if not can_end_turn(state):
         return False
 
-    if state.active_team == TEAM_PLAYER:
-        state.active_team = TEAM_ENEMY
+    if state.enemy_ai_enabled:
+        if state.active_team == TEAM_PLAYER:
+            state.active_team = TEAM_ENEMY
+        else:
+            state.active_team = TEAM_PLAYER
+            state.turn_number += 1
     else:
         state.active_team = TEAM_PLAYER
         state.turn_number += 1
 
-    for unit in state.units.values():
-        if unit.is_alive:
-            unit.reset_for_turn()
+    for unit in list(state.units.values()):
+        if not unit.is_alive:
+            continue
+        if unit.is_deployed:
+            if "regeneration" in unit.spec.special_powers and unit.hp < unit.spec.max_hp:
+                unit.hp = min(unit.spec.max_hp, unit.hp + 2)
+            if unit.poison_stacks > 0:
+                unit.hp = max(0, unit.hp - unit.poison_stacks)
+                if unit.hp <= 0:
+                    unit.hex_pos = None
+                    continue
+        unit.reset_for_turn()
 
     return True
 
