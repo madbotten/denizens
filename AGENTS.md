@@ -37,6 +37,12 @@ When designing and implementing game logic for **Denizens**, ensure that the sha
      $$\text{total\_battles}(s) = \frac{(s - 1) \cdot s}{2}$$
      (`0, 1, 3, 6, 10, 15, 21, 28` for Stages `1..8`).
 
+4. **Campaign Difficulty Modes & Genetic Bot Evolution (`bots.py` & `bot_stable.json`)**:
+   - **`GAME_MODE_BASIC` (Play Basic)**: Classic Benchmark AI (`rules.py`) with adaptive wave budgets scaled to the player's surviving army points.
+   - **`GAME_MODE_INTERMEDIATE` (Play Intermediate)**: Classic Benchmark AI (`rules.py`) with the fixed mathematical wave schedule ($4 + 3(R - 1) + (R - 1)^2$).
+   - **`GAME_MODE_ADVANCED` (Play Advanced)**: Evolved Champion AI (`bots.GeneticBotController` loaded from `bot_stable.json`) with the fixed mathematical wave schedule ($4 + 3(R - 1) + (R - 1)^2$).
+   - **UI-Free Evolutionary Arena (`bots.py`)**: Evolves `BotGenome` populations (`SetupGenes`, per-species `MammalTacticalGenes`, `TargetingGenes`, `LookaheadGenes` up to 4 plies, and `GlobalCoordinationGenes`) via paired North/South-swapped tournaments, direct champion mutations (`mutate_champion`), two-parent crossovers (`crossover_and_mutate`), and random injections (`create_random_genome`). Persists top champions to `bot_stable.json`.
+
 ---
 
 ## Asset Organization & Visual Standards

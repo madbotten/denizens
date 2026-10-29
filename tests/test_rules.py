@@ -949,6 +949,121 @@ def test_bot_stable_persistence_and_evolution_loop(tmp_path) -> None:
     assert "SPECIES TACTICAL GENES" in dump_txt
 
 
+def test_three_campaign_modes_basic_intermediate_and_advanced() -> None:
+    """
+    Phase 3 (Bot Evolution Plan):
+      - `GAME_MODE_BASIC` uses Classic Bot (`active_bot_id == "legacy_classic"`) and
+        adaptive wave point budgets.
+      - `GAME_MODE_INTERMEDIATE` uses Classic Bot (`active_bot_id == "legacy_classic"`)
+        and the fixed mathematical wave schedule (`4 + 3*(R-1) + (R-1)^2`).
+      - `GAME_MODE_ADVANCED` loads the #1 Evolved Champion from `bot_stable.json`,
+        uses the fixed mathematical wave schedule, deploys waves via evolved setup genes,
+        and executes combat turns via `GeneticBotController`.
+    """
+    import random
+    import bots
+
+    rng = random.Random(2026)
+    state = rules.create_demo_battle()
+
+    # 1. Play Basic
+    assert rules.start_campaign(state, rules.GAME_MODE_BASIC, rng=rng)
+    assert state.game_mode == rules.GAME_MODE_BASIC
+    assert state.active_bot_id == "legacy_classic"
+    assert state.active_bot_name == "Classic Bot"
+
+    # 2. Play Intermediate (Classic Bot + Fixed Schedule)
+    assert rules.start_campaign(state, rules.GAME_MODE_INTERMEDIATE, rng=rng)
+    assert state.game_mode == rules.GAME_MODE_INTERMEDIATE
+    assert state.active_bot_id == "legacy_classic"
+    assert state.active_bot_name == "Classic Bot"
+    # Even if only 1 player reptile remains in Round 3, Intermediate uses fixed schedule (14 pts)
+    p_ids = [u.unit_id for u in state.get_player_army_units()]
+    for uid in p_ids[1:]:
+        del state.units[uid]
+    state.round_number = 3
+    assert rules.enemy_wave_budget(state) == 14
+
+    # 3. Play Advanced (Evolved Stable Bot + Fixed Schedule)
+    assert rules.start_campaign(state, rules.GAME_MODE_ADVANCED, rng=rng)
+    assert state.game_mode == rules.GAME_MODE_ADVANCED
+    stable = bots.BotStable.load()
+    expected_top = stable.get_top_bot(0)
+    assert state.active_bot_id == expected_top.bot_id
+    assert state.active_bot_name == expected_top.name
+    assert state.active_bot_ply == expected_top.lookahead.lookahead_ply
+
+    # Deploy all player units and confirm deployment, then run the Evolved Bot's Turn 1
+    lower_hexes = rules.get_valid_player_deploy_hexes(state)
+    for idx, pu in enumerate(state.get_player_army_units()):
+        assert rules.deploy_unit_to_hex(state, pu.unit_id, lower_hexes[idx])
+    assert rules.confirm_deployment(state)
+    assert state.phase == rules.PHASE_BATTLE
+    assert rules.end_turn(state)
+    assert state.active_team == rules.TEAM_ENEMY
+
+    records = rules.run_enemy_turn(state)
+    assert len(records) >= 1
+    assert records[-1].action_type == "end_turn"
+    assert state.active_team == rules.TEAM_PLAYER
+    assert state.turn_number == 2
+
+
+def test_mammal_round_by_round_unlock_progression() -> None:
+    """
+    Mammals unlock progressively one per round in ascending power/cost order:
+      - Round 1: Rat (1 pt)
+      - Round 2: +Wolf (2 pts)
+      - Round 3: +Bear (4 pts)
+      - Round 4: +Lion (5 pts)
+      - Round 5: +Griffon (7 pts)
+      - ... up to Round 13: +Rajang (22 pts)
+    Both Classic `rules.purchase_enemy_wave` and Evolved `GeneticBotController.purchase_wave_specs`
+    strictly enforce the unlock gate so early waves never spawn heavy hitters like Griffons.
+    """
+    import random
+    import bots
+    from creatures import get_unlocked_mammals
+
+    rng = random.Random(42)
+    expected_names_by_round = [
+        "Rat",
+        "Wolf",
+        "Bear",
+        "Lion",
+        "Griffon",
+        "Owlbear",
+        "Displacer Beast",
+        "Dire Wolf",
+        "Manticore",
+        "Sabertooth",
+        "Behemoth",
+        "Hell Hound",
+        "Rajang",
+    ]
+    for r, expected_newest in enumerate(expected_names_by_round, start=1):
+        unlocked = get_unlocked_mammals(r)
+        assert len(unlocked) == r
+        assert unlocked[-1].name == expected_newest
+
+    # Even with a generous 16-pt budget in Round 2, neither Classic nor Evolved bots
+    # may purchase anything above Wolf (2 pts; unlock_round <= 2)
+    classic_r2 = rules.purchase_enemy_wave(round_number=2, budget=16, rng=rng)
+    assert all(s.unlock_round <= 2 and s.name in ("Rat", "Wolf") for s in classic_r2)
+
+    champ_ctrl = bots.GeneticBotController(bots.BotStable.load().get_top_bot(0))
+    evolved_r2 = champ_ctrl.purchase_wave_specs(round_number=2, budget=16, rng=rng)
+    assert all(s.unlock_round <= 2 and s.name in ("Rat", "Wolf") for s in evolved_r2)
+
+    # In Round 3, Bears (4 pts) unlock, but Lions (R4) and Griffons (R5) are still locked
+    classic_r3 = rules.purchase_enemy_wave(round_number=3, budget=20, rng=rng)
+    assert all(s.unlock_round <= 3 and s.name in ("Rat", "Wolf", "Bear") for s in classic_r3)
+    evolved_r3 = champ_ctrl.purchase_wave_specs(round_number=3, budget=20, rng=rng)
+    assert all(s.unlock_round <= 3 and s.name in ("Rat", "Wolf", "Bear") for s in evolved_r3)
+
+
+
+
 
 
 

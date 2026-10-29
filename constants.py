@@ -39,6 +39,7 @@ WAVE_POINTS_QUAD: int = 1      # Quadratic growth per round in Advanced mode
 
 # Game Modes & Battle Phases
 GAME_MODE_BASIC: str = "basic"
+GAME_MODE_INTERMEDIATE: str = "intermediate"
 GAME_MODE_ADVANCED: str = "advanced"
 
 PHASE_SPLASH: str = "SPLASH"

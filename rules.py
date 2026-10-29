@@ -38,6 +38,7 @@ from constants import (
     FRONT_RIGHT,
     GAME_MODE_ADVANCED,
     GAME_MODE_BASIC,
+    GAME_MODE_INTERMEDIATE,
     INITIAL_ARMY_SIZE,
     JUNCTURE_AFTER_MOVE,
     JUNCTURE_AFTER_POST_ROTATE,
@@ -70,6 +71,8 @@ from creatures import (
     CreatureSpec,
     evolution_battles_required,
     get_creature_spec,
+    get_unlocked_mammals,
+    is_mammal_unlocked,
     stage_for_battles_survived,
 )
 from hexgrid import (
@@ -214,6 +217,9 @@ class GameState:
     ai_acted_unit_ids: Set[str] = field(default_factory=set)
     evolution_records: List[EvolutionRecord] = field(default_factory=list)
     last_attack_results: List[AttackResult] = field(default_factory=list)
+    active_bot_id: str = "legacy_classic"
+    active_bot_name: str = "Classic Bot"
+    active_bot_ply: int = 1
 
     def get_unit(self, unit_id: Optional[str]) -> Optional[Unit]:
         if unit_id is None:
@@ -301,6 +307,9 @@ def clone_game_state(state: GameState) -> GameState:
         ai_acted_unit_ids=set(state.ai_acted_unit_ids),
         evolution_records=list(state.evolution_records),
         last_attack_results=list(state.last_attack_results),
+        active_bot_id=state.active_bot_id,
+        active_bot_name=state.active_bot_name,
+        active_bot_ply=state.active_bot_ply,
     )
 
 
@@ -474,6 +483,9 @@ def confirm_deployment(state: GameState) -> bool:
     state.active_team = TEAM_PLAYER
     state.turn_number = 1
     state.ai_acted_unit_ids.clear()
+    adv_ctrl = getattr(state, "_advanced_bot_controller", None)
+    if adv_ctrl is not None:
+        adv_ctrl.reset_for_battle()
     for unit in state.units.values():
         if unit.is_alive:
             unit.reset_for_turn()
@@ -583,21 +595,52 @@ def enemy_wave_budget(state: GameState) -> int:
     """
     Compute the computer opponent's Mammal wave point budget for `state.round_number`:
       - Round 1: Always `WAVE_BASE_POINTS` (4 points -> 4 Rats).
-      - GAME_MODE_ADVANCED: Fixed mathematical schedule `4 + 3*(R-1) + (R-1)^2`.
-      - GAME_MODE_BASIC: Adaptive budget scaled to the player's surviving army points
-        so battles always challenge the player without overwhelming them.
+      - GAME_MODE_INTERMEDIATE & GAME_MODE_ADVANCED:
+          Fixed mathematical schedule `4 + 3*(R-1) + (R-1)^2`.
+      - GAME_MODE_BASIC:
+          Adaptive budget scaled to the player's surviving army points
+          so battles always challenge the player without overwhelming them.
     """
     r = max(1, state.round_number)
     if r == 1:
         return WAVE_BASE_POINTS
 
-    if state.game_mode == GAME_MODE_ADVANCED:
+    if state.game_mode in (GAME_MODE_INTERMEDIATE, GAME_MODE_ADVANCED):
         return WAVE_BASE_POINTS + WAVE_POINTS_LINEAR * (r - 1) + WAVE_POINTS_QUAD * (r - 1) ** 2
 
     # GAME_MODE_BASIC: Adaptive based on player's surviving army strength
     player_pts = calculate_player_army_points(state)
     adaptive = int(round(player_pts * 0.80)) + min(r - 1, 6)
     return max(WAVE_BASE_POINTS, adaptive)
+
+
+def _get_or_create_advanced_bot_controller(state: GameState):
+    """
+    Return the active `GeneticBotController` for `state` when playing in
+    `GAME_MODE_ADVANCED`, loading the top evolved champion from `bot_stable.json`.
+    """
+    cached = getattr(state, "_advanced_bot_controller", None)
+    if cached is not None and getattr(cached, "bot_id", None) == state.active_bot_id:
+        return cached
+
+    import bots
+
+    stable = bots.BotStable.load()
+    chosen_genome = None
+    if state.active_bot_id and state.active_bot_id != "legacy_classic":
+        for g in stable.bots:
+            if g.bot_id == state.active_bot_id:
+                chosen_genome = g
+                break
+    if chosen_genome is None:
+        chosen_genome = stable.get_top_bot(0)
+
+    state.active_bot_id = chosen_genome.bot_id
+    state.active_bot_name = chosen_genome.name
+    state.active_bot_ply = chosen_genome.lookahead.lookahead_ply
+    ctrl = bots.GeneticBotController(chosen_genome)
+    setattr(state, "_advanced_bot_controller", ctrl)
+    return ctrl
 
 
 def purchase_enemy_wave(
@@ -607,21 +650,21 @@ def purchase_enemy_wave(
     rng: Optional[random.Random] = None,
 ) -> List[CreatureSpec]:
     """
-    Spend `budget` points to buy up to `max_units` Mammal enemy specs.
-    In Round 1 (budget=4), buys 4 Rats (1 pt each).
-    In later rounds, buys stronger mammals as budget and round_number rise.
+    Spend `budget` points to buy up to `max_units` Mammal enemy specs from the
+    subset of Mammals unlocked on or before `round_number` (`get_unlocked_mammals`):
+      - Round 1: Rat (1 pt)
+      - Round 2: +Wolf (2 pts)
+      - Round 3: +Bear (4 pts)
+      - Round 4: +Lion (5 pts)
+      - Round 5: +Griffon (7 pts)
+      - ... up to Round 13: +Rajang (22 pts)
     """
     if rng is None:
         rng = random.Random()
 
     remaining = max(1, budget)
     purchased: List[CreatureSpec] = []
-
-    # Cap the maximum single-unit point cost allowed in early rounds so Round 1 is purely Rats
-    if round_number <= 1:
-        max_single_cost = 1
-    else:
-        max_single_cost = min(budget, 1 + round_number * 3)
+    unlocked_mammals = get_unlocked_mammals(round_number)
 
     while remaining > 0 and len(purchased) < max_units:
         slots_left = max_units - len(purchased)
@@ -630,8 +673,8 @@ def purchase_enemy_wave(
 
         affordable = [
             spec
-            for spec in MAMMAL_LINEUP
-            if spec.point_cost <= remaining and spec.point_cost <= max_single_cost
+            for spec in unlocked_mammals
+            if spec.point_cost <= remaining
         ]
         if not affordable:
             break
@@ -665,6 +708,15 @@ def spawn_enemy_wave_on_board(
         del state.units[uid]
 
     state.wave_budget = enemy_wave_budget(state)
+    if state.game_mode == GAME_MODE_ADVANCED:
+        ctrl = _get_or_create_advanced_bot_controller(state)
+        return ctrl.purchase_and_deploy_army(
+            state, TEAM_ENEMY, state.wave_budget, rng=rng
+        )
+
+    state.active_bot_id = "legacy_classic"
+    state.active_bot_name = "Classic Bot"
+    state.active_bot_ply = 1
     wave_specs = purchase_enemy_wave(
         state.round_number,
         state.wave_budget,
@@ -1603,6 +1655,16 @@ def execute_next_ai_action(
     if not allow_any_team and state.active_team != TEAM_ENEMY:
         return None
 
+    # In Play Advanced mode, the enemy Mammal wave is commanded by the top evolved
+    # bot from `bot_stable.json` using X-ply lookahead and evolved tactical genes.
+    if (
+        not allow_any_team
+        and state.game_mode == GAME_MODE_ADVANCED
+        and state.active_team == TEAM_ENEMY
+    ):
+        ctrl = _get_or_create_advanced_bot_controller(state)
+        return ctrl.execute_next_action(state)
+
     active_team = state.active_team
     opp_units = [
         u
@@ -1890,11 +1952,17 @@ def start_campaign(
     rng: Optional[random.Random] = None,
 ) -> bool:
     """
-    Start a new Round 1 campaign in `PHASE_SETUP` with the chosen `game_mode`
-    (`GAME_MODE_BASIC` for adaptive wave budgets or `GAME_MODE_ADVANCED` for fixed curve).
+    Start a new Round 1 campaign in `PHASE_SETUP` with the chosen `game_mode`:
+      - `GAME_MODE_BASIC`        : Classic Bot + adaptive wave budget
+      - `GAME_MODE_INTERMEDIATE` : Classic Bot + fixed mathematical wave schedule
+      - `GAME_MODE_ADVANCED`     : Evolved Bot (`bot_stable.json`) + fixed wave schedule
     Mutates `state` in place so callers holding a reference to `state` see the new campaign.
     """
-    if game_mode not in (GAME_MODE_BASIC, GAME_MODE_ADVANCED):
+    if game_mode not in (
+        GAME_MODE_BASIC,
+        GAME_MODE_INTERMEDIATE,
+        GAME_MODE_ADVANCED,
+    ):
         return False
 
     fresh = create_initial_game_state(game_mode=game_mode, rng=rng)
@@ -1914,6 +1982,14 @@ def start_campaign(
     state.last_attack_results = fresh.last_attack_results
     state.enemy_ai_enabled = fresh.enemy_ai_enabled
     state.ai_acted_unit_ids = fresh.ai_acted_unit_ids
+    state.active_bot_id = fresh.active_bot_id
+    state.active_bot_name = fresh.active_bot_name
+    state.active_bot_ply = fresh.active_bot_ply
+    setattr(
+        state,
+        "_advanced_bot_controller",
+        getattr(fresh, "_advanced_bot_controller", None),
+    )
     return True
 
 

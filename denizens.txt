@@ -79,23 +79,36 @@ Enemies (Mammals — Points-Based Waves, Do Not Evolve):
   - Opposing forces consist of 13 Mammal enemy forms purchased by the computer
     opponent each wave using a point budget (up to MAX_ARMY_SIZE = 16 units).
   - Round 1 starts with a 4-point wave budget (4 Rats at 1 pt each).
-  - In Play Basic mode, the enemy wave budget adapts to the player's surviving
-    army points so battles always challenge the player without overwhelming them.
-    In Play Advanced mode, the enemy wave budget follows a fixed mathematical
-    schedule (4 + 3*(R-1) + (R-1)^2) that punishes falling behind the curve:
-      1. Rat             (1 pt)
-      2. Wolf            (2 pts)
-      3. Bear            (4 pts)
-      4. Lion            (5 pts)
-      5. Griffon         (7 pts)
-      6. Owlbear         (9 pts)
-      7. Behemoth        (17 pts)
-      8. Displacer Beast (11 pts)
-      9. Manticore       (14 pts)
-     10. Rajang          (22 pts)
-     11. Dire Wolf       (12 pts)
-     12. Sabertooth      (15 pts)
-     13. Hell Hound      (19 pts)
+  - Three Campaign Difficulty Modes:
+    * Play Basic (1 / B / Enter):
+      Commanded by the Classic Benchmark Bot. The enemy wave budget adapts to
+      the player's surviving army points so battles always challenge the player
+      without overwhelming them after a costly fight.
+    * Play Intermediate (2 / M):
+      Commanded by the Classic Benchmark Bot. The enemy wave budget follows the
+      unforgiving fixed mathematical schedule (4 + 3*(R-1) + (R-1)^2) regardless
+      of player losses.
+    * Play Advanced (3 / A):
+      Commanded by the #1 Evolved Champion Bot from `bot_stable.json` using
+      evolved army setup/purchasing genes, species-specific tactical genes,
+      hybrid kill-confirmation targeting, and X-ply lookahead beam search
+      (up to 4 plies) on the fixed mathematical wave schedule.
+  - Progressive Round-by-Round Mammal Unlock Schedule (1 new species unlocked
+    each round in ascending power/cost order, so heavy hitters only appear in
+    later rounds):
+      Round  1 Unlock : Rat             (1 pt)
+      Round  2 Unlock : Wolf            (2 pts)
+      Round  3 Unlock : Bear            (4 pts)
+      Round  4 Unlock : Lion            (5 pts)
+      Round  5 Unlock : Griffon         (7 pts)
+      Round  6 Unlock : Owlbear         (9 pts)
+      Round  7 Unlock : Displacer Beast (11 pts)
+      Round  8 Unlock : Dire Wolf       (12 pts)
+      Round  9 Unlock : Manticore       (14 pts)
+      Round 10 Unlock : Sabertooth      (15 pts)
+      Round 11 Unlock : Behemoth        (17 pts)
+      Round 12 Unlock : Hell Hound      (19 pts)
+      Round 13 Unlock : Rajang          (22 pts)
 
 
 4. ATTRIBUTE-DRIVEN MOVEMENT, ROTATION, FLIGHT & ATTACK JUNCTURES
@@ -190,8 +203,10 @@ Turtle 8-Stage Lineup:
 6. CONTROLS & INTERFACE
 -----------------------
   - Title Screen (Splash)    : Press I to View Instructions, 1 / B / Enter to
-                               Play Basic (adaptive waves), or 2 / A to Play
-                               Advanced (fixed mathematical wave schedule).
+                               Play Basic (Classic Bot + adaptive waves),
+                               2 / M to Play Intermediate (Classic Bot + fixed
+                               wave schedule), or 3 / A to Play Advanced
+                               (Evolved X-Ply Bot + fixed wave schedule).
   - Drag-and-Drop (Setup)    : Drag reptiles from the Left Army Reserve Tray
                                (2x8 slots) onto the green lower half of the
                                battlefield (one per hex), or drag back to

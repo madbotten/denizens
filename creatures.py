@@ -5,7 +5,7 @@ Creature specifications, evolution progression math, and class lineups for Deniz
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, FrozenSet, Tuple
+from typing import Dict, FrozenSet, List, Tuple
 
 from constants import (
     CLASS_LIZARD,
@@ -85,6 +85,7 @@ class CreatureSpec:
     attack_arcs: FrozenSet[int] = frozenset({FORWARD})
     vulnerable_arcs: FrozenSet[int] = DEFAULT_VULNERABLE_ARCS
     special_powers: Tuple[str, ...] = ()
+    unlock_round: int = 1
 
     @property
     def topdown_path(self) -> str:
@@ -539,6 +540,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=1,
         asset_slug="01_rat",
         point_cost=1,
+        unlock_round=1,
         num_rotate_moves=1,
         max_rotate_per_move=1,
         legal_move_dirs=DIRS_FORWARD_ONLY,
@@ -555,6 +557,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=2,
         asset_slug="02_wolf",
         point_cost=2,
+        unlock_round=2,
         num_rotate_moves=2,
         max_rotate_per_move=1,
         legal_move_dirs=DIRS_FORWARD_ONLY,
@@ -572,6 +575,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=3,
         asset_slug="03_bear",
         point_cost=4,
+        unlock_round=3,
         num_rotate_moves=1,
         max_rotate_per_move=1,
         legal_move_dirs=DIRS_FORWARD_REAR,
@@ -589,6 +593,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=4,
         asset_slug="04_lion",
         point_cost=5,
+        unlock_round=4,
         num_rotate_moves=2,
         max_rotate_per_move=2,
         legal_move_dirs=DIRS_FRONT_ARC,
@@ -606,6 +611,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=5,
         asset_slug="05_griffon",
         point_cost=7,
+        unlock_round=5,
         num_rotate_moves=3,
         max_rotate_per_move=2,
         legal_move_dirs=DIRS_FRONT_ARC,
@@ -623,6 +629,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=6,
         asset_slug="06_owlbear",
         point_cost=9,
+        unlock_round=6,
         num_rotate_moves=2,
         max_rotate_per_move=2,
         legal_move_dirs=DIRS_FORWARD_REAR,
@@ -640,6 +647,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=7,
         asset_slug="07_behemoth",
         point_cost=17,
+        unlock_round=11,
         num_rotate_moves=2,
         max_rotate_per_move=1,
         legal_move_dirs=DIRS_FORWARD_REAR,
@@ -657,6 +665,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=8,
         asset_slug="08_displacer_beast",
         point_cost=11,
+        unlock_round=7,
         num_rotate_moves=3,
         max_rotate_per_move=3,
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
@@ -675,6 +684,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=9,
         asset_slug="09_manticore",
         point_cost=14,
+        unlock_round=9,
         num_rotate_moves=3,
         max_rotate_per_move=2,
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
@@ -692,6 +702,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=10,
         asset_slug="10_rajang",
         point_cost=22,
+        unlock_round=13,
         num_rotate_moves=3,
         max_rotate_per_move=2,
         legal_move_dirs=DIRS_ALL_SIX,
@@ -709,6 +720,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=11,
         asset_slug="11_dire_wolf",
         point_cost=12,
+        unlock_round=8,
         num_rotate_moves=3,
         max_rotate_per_move=2,
         legal_move_dirs=DIRS_FRONT_ARC,
@@ -726,6 +738,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=12,
         asset_slug="12_sabertooth",
         point_cost=15,
+        unlock_round=10,
         num_rotate_moves=3,
         max_rotate_per_move=2,
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
@@ -743,6 +756,7 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         stage=13,
         asset_slug="13_hell_hound",
         point_cost=19,
+        unlock_round=12,
         num_rotate_moves=3,
         max_rotate_per_move=2,
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
@@ -775,3 +789,22 @@ def get_creature_spec(creature_class: str, stage: int) -> CreatureSpec:
     lineup = CLASS_LINEUPS[creature_class]
     clamped_idx = max(0, min(len(lineup) - 1, stage - 1))
     return lineup[clamped_idx]
+
+
+def is_mammal_unlocked(spec: CreatureSpec, round_number: int) -> bool:
+    """
+    Return True if `spec` is unlocked for Mammal wave purchasing in `round_number` (1-based).
+    Mammals unlock progressively one per round in ascending power/cost order (Rounds 1..13).
+    """
+    return max(1, round_number) >= spec.unlock_round
+
+
+def get_unlocked_mammals(round_number: int) -> List[CreatureSpec]:
+    """
+    Return all Mammal enemy specs unlocked on or before `round_number`, sorted by
+    `unlock_round` (ascending power/cost order).
+    """
+    r = max(1, round_number)
+    unlocked = [spec for spec in MAMMAL_LINEUP if spec.unlock_round <= r]
+    unlocked.sort(key=lambda s: (s.unlock_round, s.point_cost))
+    return unlocked

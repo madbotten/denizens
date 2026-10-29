@@ -450,11 +450,11 @@ class BattleRenderer:
                 ),
             )
 
-        # Three Primary Mode & Instructions Cards
+        # Four Primary Mode & Instructions Cards
         cards_y = 572
         cards_h = 496
-        gap_x = 32
-        card_w = (gallery_rect.width - 2 * gap_x) // 3  # ~666px each
+        gap_x = 20
+        card_w = (gallery_rect.width - 3 * gap_x) // 4  # ~511px each
 
         card_configs = [
             {
@@ -463,14 +463,13 @@ class BattleRenderer:
                 "title_col": C.COLOR_TEXT_CYAN,
                 "border_col": (70, 125, 165),
                 "bullets": [
-                    "• Overview of the 61-hex arena & persistent reptile army",
-                    "• 6 Hex Facings, Attack Arcs & Vulnerable Flanks/Rear",
-                    "• Reptilian Classes: Serpents, Lizards & Armored Turtles",
-                    "• 13 Enemy Mammal Wave Forms & Point Costs (1 to 22 pts)",
-                    "• Attribute-Driven Movement (num_rotate_moves, can_fly,",
-                    "  legal_move_dirs, post-move Lizard rotation)",
-                    "• Attack Junctures (BEFORE / AFTER_ROTATE / AFTER_MOVE)",
-                    "• 8-Stage Triangular Evolution Progression (0..28 battles)",
+                    "• 61-hex arena & persistent reptile army",
+                    "• 6 Hex Facings, Attack Arcs & Flank/Rear",
+                    "• Classes: Serpents, Lizards & Turtles",
+                    "• 13 Enemy Mammal Forms (1 to 22 pts)",
+                    "• Attribute-Driven Moves, Flight & Rotations",
+                    "• Attack Junctures (BEFORE/AFTER ROT/MOVE)",
+                    "• 8-Stage Triangular Evolution (0..28 battles)",
                     "• Full Mouse & Keyboard Control Reference",
                 ],
                 "btn_label": "View Instructions [I]",
@@ -478,42 +477,59 @@ class BattleRenderer:
                 "btn_color": (52, 108, 148),
             },
             {
-                "title": "PLAY BASIC  (ADAPTIVE WAVES)",
-                "subtitle": "Balanced Dynamic Wave Point Scaling",
+                "title": "PLAY BASIC",
+                "subtitle": "Classic Bot • Adaptive Wave Budget",
                 "title_col": C.COLOR_TEXT_GREEN,
                 "border_col": (65, 150, 95),
                 "bullets": [
-                    "• Begin Round 1 with 6 random Stage 1 reptiles in Reserve",
-                    "• Round 1 opposes you with a 4-point Mammal wave (4 Rats)",
-                    "• Receive +4 new Stage 1 reptile reinforcements each round",
-                    "  (up to MAX_ARMY_SIZE = 16 units)",
-                    "• Adaptive Wave Budget: Each subsequent round scales the",
-                    "  computer opponent's Mammal point budget to your",
-                    "  surviving army's total point value",
-                    "• Guarantees a fair, tailored tactical challenge that",
-                    "  never snowballs out of reach after a costly battle",
+                    "• Begin Round 1 with 6 Stage 1 reptiles",
+                    "• +4 Stage 1 reinforcements each round",
+                    "• Opposed by the Classic Benchmark Bot",
+                    "• Adaptive Wave Budget: Scales each wave's",
+                    "  Mammal point budget to your surviving",
+                    "  reptile army's total point value",
+                    "• Forgiving curve that stays fair even",
+                    "  after a costly battle",
                 ],
                 "btn_label": "Play Basic [1 / B / Enter]",
                 "action_id": "play_basic",
                 "btn_color": (56, 148, 92),
             },
             {
-                "title": "PLAY ADVANCED  (FIXED SCHEDULE)",
-                "subtitle": "Unforgiving Mathematical Escalation Curve",
+                "title": "PLAY INTERMEDIATE",
+                "subtitle": "Classic Bot • Fixed Wave Schedule",
+                "title_col": C.COLOR_TEXT_GOLD,
+                "border_col": (175, 138, 62),
+                "bullets": [
+                    "• Begin Round 1 with 6 Stage 1 reptiles",
+                    "• +4 Stage 1 reinforcements each round",
+                    "• Opposed by the Classic Benchmark Bot",
+                    "• Fixed Mathematical Wave Schedule:",
+                    "  Budget(R) = 4 + 3*(R - 1) + (R - 1)^2",
+                    "  R1: 4 • R2: 8 • R3: 14 • R4: 22 • R5: 32",
+                    "• High-tier Mammals arrive on schedule",
+                    "  regardless of your previous losses",
+                ],
+                "btn_label": "Play Intermediate [2 / M]",
+                "action_id": "play_intermediate",
+                "btn_color": (152, 114, 48),
+            },
+            {
+                "title": "PLAY ADVANCED",
+                "subtitle": "Evolved X-Ply Bot • Fixed Schedule",
                 "title_col": C.COLOR_TEXT_RED,
                 "border_col": (165, 72, 72),
                 "bullets": [
-                    "• Begin Round 1 with 6 random Stage 1 reptiles in Reserve",
-                    "• Receive +4 new Stage 1 reptile reinforcements each round",
-                    "• Unrelenting Fixed Wave Schedule:",
-                    "  Wave Budget(R) = 4 + 3*(R - 1) + (R - 1)^2",
-                    "  Round 1: 4 pts   •  Round 2: 8 pts   •  Round 3: 14 pts",
-                    "  Round 4: 22 pts  •  Round 5: 32 pts  •  Round 6: 44 pts",
-                    "• High-tier Mammals (Behemoth, Hell Hound, Rajang) arrive",
-                    "  on schedule regardless of your losses",
-                    "• Protect & evolve your veterans or be overrun!",
+                    "• Fixed Mathematical Wave Schedule:",
+                    "  Budget(R) = 4 + 3*(R - 1) + (R - 1)^2",
+                    "• Commanded by the #1 Evolved Champion",
+                    "  from your Bot Stable (bot_stable.json)",
+                    "• Evolved Setup & Wave Purchasing Genes",
+                    "• Multi-Ply Lookahead (up to 4-Ply beam",
+                    "  search), flank/rear protection, pack",
+                    "  coordination & hybrid kill-confirm AI!",
                 ],
-                "btn_label": "Play Advanced [2 / A]",
+                "btn_label": "Play Advanced [3 / A]",
                 "action_id": "play_advanced",
                 "btn_color": (158, 62, 62),
             },
@@ -546,19 +562,22 @@ class BattleRenderer:
             pygame.draw.line(
                 self.screen,
                 (64, 72, 86),
-                (crect.x + 24, crect.y + 86),
-                (crect.right - 24, crect.y + 86),
+                (crect.x + 20, crect.y + 86),
+                (crect.right - 20, crect.y + 86),
                 width=1,
             )
 
             by = crect.y + 104
+            max_b_w = crect.width - 40
             for b_line in cfg["bullets"]:
                 bsurf = self.font_body.render(b_line, True, C.COLOR_TEXT_MAIN)
-                self.screen.blit(bsurf, (crect.x + 26, by))
-                by += 32
+                if bsurf.get_width() > max_b_w:
+                    bsurf = self.font_small.render(b_line, True, C.COLOR_TEXT_MAIN)
+                self.screen.blit(bsurf, (crect.x + 20, by))
+                by += 34
 
             btn_rect = pygame.Rect(
-                crect.x + 36, crect.bottom - 72, crect.width - 72, 52
+                crect.x + 24, crect.bottom - 72, crect.width - 48, 52
             )
             self.buttons.append(
                 UIButton(
@@ -618,17 +637,17 @@ class BattleRenderer:
         self.screen.blit(hint, (hdr_rect.x + 20, hdr_rect.y + 46))
 
         # Top-Right Navigation & Quick-Start Buttons
-        back_rect = pygame.Rect(hdr_rect.right - 740, hdr_rect.y + 15, 310, 44)
+        back_rect = pygame.Rect(hdr_rect.right - 850, hdr_rect.y + 15, 250, 44)
         self.buttons.append(
             UIButton(
                 back_rect,
-                "Back to Title Screen [Esc / Enter]",
+                "Back to Title [Esc / Enter]",
                 "close_instructions",
                 enabled=True,
                 accent_color=(65, 115, 155),
             )
         )
-        basic_rect = pygame.Rect(hdr_rect.right - 416, hdr_rect.y + 15, 194, 44)
+        basic_rect = pygame.Rect(hdr_rect.right - 590, hdr_rect.y + 15, 175, 44)
         self.buttons.append(
             UIButton(
                 basic_rect,
@@ -638,11 +657,21 @@ class BattleRenderer:
                 accent_color=(56, 148, 92),
             )
         )
-        adv_rect = pygame.Rect(hdr_rect.right - 210, hdr_rect.y + 15, 194, 44)
+        inter_rect = pygame.Rect(hdr_rect.right - 405, hdr_rect.y + 15, 195, 44)
+        self.buttons.append(
+            UIButton(
+                inter_rect,
+                "Play Intermediate [2]",
+                "play_intermediate",
+                enabled=True,
+                accent_color=(152, 114, 48),
+            )
+        )
+        adv_rect = pygame.Rect(hdr_rect.right - 200, hdr_rect.y + 15, 185, 44)
         self.buttons.append(
             UIButton(
                 adv_rect,
-                "Play Advanced [2]",
+                "Play Advanced [3]",
                 "play_advanced",
                 enabled=True,
                 accent_color=(158, 62, 62),
@@ -1194,10 +1223,15 @@ class BattleRenderer:
         if state.phase == C.PHASE_SETUP:
             army_units = state.get_player_army_units()
             deployed_cnt = sum(1 for u in army_units if u.is_deployed)
+            bot_tag = (
+                f"{state.active_bot_name} ({state.active_bot_ply}-Ply)"
+                if state.game_mode == C.GAME_MODE_ADVANCED
+                else "Classic Bot"
+            )
             header_txt = (
                 f"ROUND {state.round_number} — ARMY SETUP PHASE   •   "
                 f"DEPLOYED: {deployed_cnt}/{len(army_units)}   •   "
-                f"ENEMY WAVE BUDGET: {state.wave_budget} PTS ({state.game_mode.upper()})"
+                f"WAVE: {state.wave_budget} PTS ({state.game_mode.upper()} • {bot_tag})"
             )
             header_col = C.COLOR_TEXT_GOLD
             controls_txt = (
@@ -1236,10 +1270,15 @@ class BattleRenderer:
                     if state.active_team == C.TEAM_PLAYER
                     else C.COLOR_TEXT_RED
                 )
+                enemy_turn_lbl = (
+                    f"EVOLVED AI: {state.active_bot_name.upper()} ({state.active_bot_ply}-PLY)"
+                    if state.game_mode == C.GAME_MODE_ADVANCED
+                    else "ENEMY MAMMAL AI TURN"
+                )
                 turn_tag = (
                     "YOUR TURN"
                     if state.active_team == C.TEAM_PLAYER
-                    else "ENEMY MAMMAL AI TURN"
+                    else enemy_turn_lbl
                 )
                 header_txt = (
                     f"ROUND {state.round_number}  •  TURN {state.turn_number} ({turn_tag})  •  "
@@ -1571,9 +1610,9 @@ class BattleRenderer:
             )
         else:
             stage_label = (
-                f"Enemy Mammal #{spec.stage}/13 • Cost: {spec.point_cost} pts"
+                f"Enemy Mammal • Cost: {spec.point_cost} pts • Unlocks: R{spec.unlock_round}"
             )
-            evo_str = "Enemy Opposing Force (Non-Evolving)"
+            evo_str = f"Enemy Opposing Force (Unlocks in Round {spec.unlock_round})"
 
         name_surf = self.font_title.render(spec.name, True, C.COLOR_TEXT_MAIN)
         self.screen.blit(name_surf, (x0, y))

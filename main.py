@@ -55,7 +55,7 @@ class DenizensApp:
         self.instructions_scroll_y: int = 0
 
         self.status_message: str = (
-            "Welcome to Denizens! Choose View Instructions [I], Play Basic [1 / B / Enter], or Play Advanced [2 / A]."
+            "Welcome to Denizens! Choose View Instructions [I], Play Basic [1 / B / Enter], Play Intermediate [2 / M], or Play Advanced [3 / A]."
         )
 
     def _report_attack_results(self, results: List[rules.AttackResult]) -> None:
@@ -100,27 +100,34 @@ class DenizensApp:
         elif action_id == "close_instructions":
             if rules.close_instructions(self.state):
                 self.status_message = (
-                    "Welcome to Denizens! Choose View Instructions [I], Play Basic [1 / B / Enter], or Play Advanced [2 / A]."
+                    "Welcome to Denizens! Choose View Instructions [I], Play Basic [1 / B / Enter], Play Intermediate [2 / M], or Play Advanced [3 / A]."
                 )
 
         elif action_id == "play_basic":
             if rules.start_campaign(self.state, C.GAME_MODE_BASIC):
                 self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
                 self.status_message = (
-                    "Play Basic (Adaptive Waves) — Round 1 Setup: Drag all 6 reptiles from the Left Reserve onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
+                    "Play Basic (Classic Bot • Adaptive Waves) — Round 1 Setup: Drag all 6 reptiles onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
+                )
+
+        elif action_id == "play_intermediate":
+            if rules.start_campaign(self.state, C.GAME_MODE_INTERMEDIATE):
+                self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
+                self.status_message = (
+                    "Play Intermediate (Classic Bot • Fixed Curve) — Round 1 Setup: Drag all 6 reptiles onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
                 )
 
         elif action_id == "play_advanced":
             if rules.start_campaign(self.state, C.GAME_MODE_ADVANCED):
                 self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
                 self.status_message = (
-                    "Play Advanced (Fixed Curve) — Round 1 Setup: Drag all 6 reptiles from the Left Reserve onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
+                    f"Play Advanced (Evolved Bot: {self.state.active_bot_name} [{self.state.active_bot_ply}-Ply] • Fixed Curve) — Round 1 Setup: Drag all 6 reptiles onto the lower half!"
                 )
 
         elif action_id == "return_to_splash":
             if rules.return_to_splash(self.state):
                 self.status_message = (
-                    "Returned to Title Screen. Choose View Instructions [I], Play Basic [1 / B / Enter], or Play Advanced [2 / A]."
+                    "Returned to Title Screen. Choose View Instructions [I], Play Basic [1 / B / Enter], Play Intermediate [2 / M], or Play Advanced [3 / A]."
                 )
 
         elif action_id == "rotate_ccw" and sel_id:
@@ -397,7 +404,9 @@ class DenizensApp:
                         pygame.K_KP_ENTER,
                     ):
                         self.handle_action("play_basic")
-                    elif event.key in (pygame.K_2, pygame.K_KP2, pygame.K_a):
+                    elif event.key in (pygame.K_2, pygame.K_KP2, pygame.K_m):
+                        self.handle_action("play_intermediate")
+                    elif event.key in (pygame.K_3, pygame.K_KP3, pygame.K_a):
                         self.handle_action("play_advanced")
                     continue
 
@@ -410,9 +419,11 @@ class DenizensApp:
                         pygame.K_KP_ENTER,
                     ):
                         self.handle_action("close_instructions")
-                    elif event.key in (pygame.K_1, pygame.K_KP1):
+                    elif event.key in (pygame.K_1, pygame.K_KP1, pygame.K_b):
                         self.handle_action("play_basic")
-                    elif event.key in (pygame.K_2, pygame.K_KP2):
+                    elif event.key in (pygame.K_2, pygame.K_KP2, pygame.K_m):
+                        self.handle_action("play_intermediate")
+                    elif event.key in (pygame.K_3, pygame.K_KP3, pygame.K_a):
                         self.handle_action("play_advanced")
                     elif event.key in (pygame.K_UP, pygame.K_w):
                         self.instructions_scroll_y = max(

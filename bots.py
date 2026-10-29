@@ -45,7 +45,14 @@ from constants import (
     TEAM_ENEMY,
     TEAM_PLAYER,
 )
-from creatures import CREATURE_BY_ID, MAMMAL_LINEUP, CreatureSpec, get_creature_spec
+from creatures import (
+    CREATURE_BY_ID,
+    MAMMAL_LINEUP,
+    CreatureSpec,
+    get_creature_spec,
+    get_unlocked_mammals,
+    is_mammal_unlocked,
+)
 from hexgrid import (
     HexCoord,
     absolute_direction,
@@ -455,6 +462,12 @@ class GeneticBotController:
     def lookahead_ply(self) -> int:
         return self.genome.lookahead.lookahead_ply
 
+    def reset_for_battle(self) -> None:
+        """Clear any pending step queue and decision traces at the start of a new battle."""
+        self._pending_unit_id = None
+        self._pending_steps.clear()
+        self.decision_traces.clear()
+
     # ------------------------------------------------------------------------
     # 1. Army Purchasing & Setup Deployment (governed by `SetupGenes`)
     # ------------------------------------------------------------------------
@@ -467,8 +480,9 @@ class GeneticBotController:
         rng: Optional[random.Random] = None,
     ) -> List[CreatureSpec]:
         """
-        Spend `budget` points to purchase up to `max_units` Mammal specs using
-        `genome.setup.mammal_purchase_weights` and `genome.setup.elite_vs_swarm_bias`.
+        Spend `budget` points to purchase up to `max_units` Mammal specs from the
+        subset of Mammals unlocked on or before `round_number` (`get_unlocked_mammals`),
+        using `genome.setup.mammal_purchase_weights` and `genome.setup.elite_vs_swarm_bias`.
         """
         if rng is None:
             rng = random.Random()
@@ -477,11 +491,8 @@ class GeneticBotController:
         remaining = max(1, budget)
         purchased: List[CreatureSpec] = []
         picked_counts: Dict[str, int] = {}
-
-        if round_number <= 1:
-            max_single_cost = 1
-        else:
-            max_single_cost = min(budget, 1 + round_number * 3)
+        unlocked_mammals = get_unlocked_mammals(round_number)
+        max_unlocked_cost = max((s.point_cost for s in unlocked_mammals), default=1)
 
         while remaining > 0 and len(purchased) < max_units:
             slots_left = max_units - len(purchased)
@@ -489,8 +500,8 @@ class GeneticBotController:
 
             affordable = [
                 spec
-                for spec in MAMMAL_LINEUP
-                if spec.point_cost <= remaining and spec.point_cost <= max_single_cost
+                for spec in unlocked_mammals
+                if spec.point_cost <= remaining
             ]
             if not affordable:
                 break
@@ -498,7 +509,7 @@ class GeneticBotController:
             # Avoid filling early picks with 1-pt fodder when stronger mammals are affordable,
             # unless this bot's genome explicitly favors extreme swarm tactics
             tier_floor = (
-                max(min_desired_cost, max_single_cost // 3)
+                max(min_desired_cost, max_unlocked_cost // 3)
                 if setup.elite_vs_swarm_bias >= -0.45
                 else min_desired_cost
             )
@@ -2530,7 +2541,7 @@ def format_genome_dump(genome: BotGenome) -> str:
 
     wave_r2 = [s.name for s in ctrl.purchase_wave_specs(round_number=2, budget=8)]
     wave_r3 = [s.name for s in ctrl.purchase_wave_specs(round_number=3, budget=14)]
-    wave_r4 = [s.name for s in ctrl.purchase_wave_specs(round_number=4, budget=18)]
+    wave_r6 = [s.name for s in ctrl.purchase_wave_specs(round_number=6, budget=22)]
 
     lines = [
         "=" * 86,
@@ -2554,7 +2565,7 @@ def format_genome_dump(genome: BotGenome) -> str:
         f"     • Top Preferred Mammals : {', '.join(top_pref_strs)}",
         f"     • Deterministic Wave @  8 pts (R2): {', '.join(wave_r2)}",
         f"     • Deterministic Wave @ 14 pts (R3): {', '.join(wave_r3)}",
-        f"     • Deterministic Wave @ 18 pts (R4): {', '.join(wave_r4)}",
+        f"     • Deterministic Wave @ 22 pts (R6): {', '.join(wave_r6)}",
         "  3. TARGETING & COORDINATION GENES:",
         f"     • Target Priority Style : {target_style} (strong_vs_weak_bias = {t_genes.strong_vs_weak_bias:+.3f})",
         f"     • Hybrid Kill-Confirm   : {t_genes.hybrid_kill_confirm_weight:.3f}  |  "
@@ -2727,7 +2738,7 @@ def run_evolution(
         fitness_map: Dict[str, float] = {b.bot_id: 0.0 for b in population}
 
         # Scenarios: early/mid/late budgets with IDENTICAL benchmark seeds for all bots
-        budgets = [(2, 8), (4, 18)]
+        budgets = [(3, 14), (7, 22)]
 
         for genome in population:
             ctrl = GeneticBotController(genome, record_telemetry=True)
@@ -2750,7 +2761,7 @@ def run_evolution(
                     if lg.winner_bot_id == genome.bot_id:
                         genome.wins_vs_classic += 1
                     telemetry.record_log(lg, north_is_classic=n_cls, south_is_classic=s_cls)
-                    if log_dir and (record_all_games or (record_upsets and lg.is_upset)):
+                    if log_dir and (record_upsets and lg.is_upset or record_all_games):
                         if saved_log_count < 40:
                             lg.save_json(os.path.join(log_dir, f"gen{gen_num}_{lg.match_id}.json"))
                             saved_log_count += 1
@@ -2758,8 +2769,8 @@ def run_evolution(
             # B. Asymmetric Benchmark vs. Reptile Army (shared seed across all bots!)
             rep_log = run_benchmark_vs_reptiles(
                 ctrl,
-                round_number=3,
-                budget=14,
+                round_number=5,
+                budget=18,
                 max_turns=max_turns,
                 seed=effective_seed + gen_num * 500,
                 record_log=record_all_games,
@@ -2784,8 +2795,8 @@ def run_evolution(
             res = run_paired_skirmish(
                 ctrl_a,
                 ctrl_b,
-                round_number=3,
-                budget=14,
+                round_number=6,
+                budget=18,
                 max_turns=max_turns,
                 seed=p_seed,
                 record_log=(record_upsets or record_all_games),
