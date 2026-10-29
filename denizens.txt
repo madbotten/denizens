@@ -3,34 +3,50 @@
                         Game Overview & Core Mechanics
 ================================================================================
 
-1. OVERVIEW
------------
-Denizens is a cyclical, turn-based tactical battle game played on a hexagonal
-grid. The player commands a team of reptilian creatures across a series of
-battles against various mammalian enemies. Surviving battles allows creatures
-to evolve through 8 increasingly powerful and specialized stages.
+1. OVERVIEW & STRATEGIC TENSION
+-------------------------------
+Denizens is a cyclical, turn-based tactical battle game played on a 61-hex
+flat-top hexagonal arena (radius 4). The player commands a persistent army of
+reptilian creatures (up to MAX_ARMY_SIZE = 16, receiving REINFORCEMENTS_PER_ROUND
+new Stage 1 creatures after each round) across a series of battles against
+mammalian enemies.
+
+Surviving battles allows player creatures to evolve through 8 increasingly
+powerful and specialized stages. However, if a creature is slain in battle, its
+evolution is cut short permanently—creating a core strategic tension between
+risking your strongest evolved veterans to win tough battles and protecting them
+while training newer recruits.
 
 
 2. HEX FACINGS & DIRECTIONAL COMBAT
 -----------------------------------
-Every creature on the hex grid has an explicit orientation ("facing") aligned
-with one of the 6 sides of its hex. Relative to a creature's current orientation,
-the 6 surrounding hex directions are:
+Every creature on the flat-top hex grid has an explicit orientation ("facing")
+aligned with one of the 6 sides of its hex:
+  - 0: North      (0°   — top horizontal hex edge)
+  - 1: North-East (60°  — top-right edge)
+  - 2: South-East (120° — bottom-right edge)
+  - 3: South      (180° — bottom horizontal hex edge)
+  - 4: South-West (240° — bottom-left edge)
+  - 5: North-West (300° — top-left edge)
 
-  - Front        (forward facing)
-  - Front-Left
-  - Front-Right
-  - Flank-Left
+Relative to a creature's current orientation, the 6 surrounding hex directions
+are:
+  - Forward (Front)
+  - Forward-Right (Front-Right)
   - Flank-Right
   - Rear
+  - Flank-Left
+  - Forward-Left (Front-Left)
 
 Basic Combat Rules & Exceptions:
-  - Basic Forms (Stage 1): Can only attack into their Front hex and have
+  - Basic Forms (Stage 1): Can only attack into their Forward hex and have
     vulnerable flanks (Flank-Left, Flank-Right) and Rear when attacked from
     those directions.
-  - Evolved Forms: Many higher stages break or modify standard facing rules
-    for offense or defense (for example, the Stage 8 Hydra can attack toward
-    Front, Front-Left, and Front-Right).
+  - Evolved Forms: Higher stages modify offensive and defensive arcs (for
+    example, the Stage 5 Amphisbaena attacks both Forward and Rear and has no
+    Rear vulnerability; the Stage 8 Hydra, Young Dragon, Tian Long, and Dragon
+    Turtle attack across Forward, Forward-Left, and Forward-Right; and high-tier
+    Turtles armor their flanks and rear).
 
 
 3. PLAYER CREATURE CLASSES vs. ENEMIES
@@ -39,10 +55,10 @@ Player creatures belong to three reptilian classes, each with a distinct
 tactical identity:
 
   1. Snakes (Serpents) : High attack, fragile defense.
-  2. Lizards           : High mobility, weak attack. Capitalize on mobility by
-                         moving in directions other than their Front facing and
-                         by choosing the order of Move and Attack actions.
-  3. Turtles           : High defense, low mobility tanks.
+  2. Lizards           : High mobility, weak early attack. Capitalize on
+                         mobility with extra Rotate-Move steps, wider rotation
+                         angles, multi-directional movement, and flight.
+  3. Turtles           : High defense, low mobility armored tanks.
 
 Enemies (Mammals — Do Not Evolve):
   - Opposing forces consist of 13 Mammal enemy forms encountered across the
@@ -62,19 +78,45 @@ Enemies (Mammals — Do Not Evolve):
      13. Hell Hound
 
 
-4. TURN-BASED MOVEMENT & ACTION RULES
--------------------------------------
-Battles are turn-based. Creature movement is divided into two distinct parts:
-  - Rotations : Changing the creature's hex facing.
-  - Moves     : Entering new hexes on the board.
+4. ATTRIBUTE-DRIVEN MOVEMENT, ROTATION, FLIGHT & ATTACK JUNCTURES
+-----------------------------------------------------------------
+Rather than hardcoding movement rules, every creature form defines its tactical
+capabilities through five core attributes:
 
-Movement Rules & Exceptions:
-  - Basic Forms (Stage 1): Must move forward into the hex corresponding to
-    their current Front facing.
-  - Evolved & Class Exceptions: Specific classes and evolved forms override
-    basic movement constraints. In particular, Lizards can move in directions
-    other than their forward facing and can flexibly choose the order of their
-    Move and Attack actions during a turn.
+  - num_rotate_moves      : Number of (Rotate -> Move) cycles allowed per turn.
+  - max_rotate_per_move   : Maximum 60° hex faces (0..3) the creature may rotate
+                            from its step-start facing during each cycle.
+  - legal_move_dirs       : Set of allowed movement directions relative to the
+                            creature's instantaneous facing at the moment of the
+                            move (e.g. {Forward} for Basic Stage 1 creatures;
+                            {Forward, Forward-Left, Forward-Right, Rear} for
+                            Stage 8 Tian Long).
+  - total_attacks_per_move: Total attacks allowed during the creature's turn
+                            (default 1; up to 2 or 3 for apex evolutions).
+  - can_fly               : Winged creatures (Jaculus, Wyrm, Wyrmling, Drake,
+                            Young Dragon, Tian Long, Griffon, Manticore) can fly
+                            over occupied hexes during intermediate move steps
+                            as long as they can land on an empty hex before
+                            their turn ends.
+
+Optional Actions & Attack Junctures:
+  - Within each Rotate-Move cycle, there are three junctures:
+      1. BEFORE_ROTATE
+      2. AFTER_ROTATE
+      3. AFTER_MOVE
+  - Rotations are optional, moves are optional, and attacks are optional.
+  - A creature may take at most 1 attack per juncture, up to its
+    total_attacks_per_move limit across its turn.
+  - Example (Basic Stage 1 Creature):
+      num_rotate_moves = 1, max_rotate_per_move = 1, legal_move_dirs = {Forward}.
+      Can rotate at most 1 hex face left or right from its starting facing and
+      move 1 hex Forward, once per turn.
+  - Example (Stage 8 Tian Long):
+      num_rotate_moves = 4, max_rotate_per_move = 3,
+      legal_move_dirs = {Forward, Forward-Left, Forward-Right, Rear}, can_fly = True.
+      Can rotate to any of the 6 hex facings (up to 3 faces = 180°) before each
+      of its 4 moves, moving in any of its 4 allowed relative directions on each
+      step and flying over occupied hexes along the way.
 
 
 5. EVOLUTION SYSTEM (8 STAGES PER CLASS)
@@ -120,3 +162,19 @@ Turtle 8-Stage Lineup:
   6. Alligator Snapper
   7. War Turtle
   8. Dragon Turtle
+
+
+6. CONTROLS & INTERFACE
+-----------------------
+  - Left-Click Unit          : Select unit and inspect its portrait, stats, and
+                               legal moves/rotations.
+  - Wheel / Left-Right / Q-E : Rotate selected unit 60° counter-clockwise or
+                               clockwise within max_rotate_per_move.
+  - Right-Click Adjacent Hex : Rotate selected unit toward an adjacent hex.
+  - Left-Click Highlight Hex : Move selected unit into a legal destination hex
+                               (green = empty hex, cyan = fly-over occupied hex).
+  - F Key                    : Execute/test attack at current juncture
+                               (BEFORE_ROTATE / AFTER_ROTATE / AFTER_MOVE).
+  - Space Key                : End current team's turn.
+  - [ / ] Keys (DEBUG=True)  : Cycle selected unit's evolution stage (1..8) or
+                               Mammal enemy form (1..13).

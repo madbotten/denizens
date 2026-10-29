@@ -21,12 +21,14 @@ When designing and implementing game logic for **Denizens**, ensure that the sha
    - Creature heads must look **forward along the ground plane toward the top of the image**, **NEVER** tilted upward to face/stare at the camera, and **NEVER** showing ventral/throat/underside neck scales as if rearing up at the viewer.
    - *(Note: `portraits/` assets are character stat portraits and SHOULD show the creature's head/upper body from the front or dramatic three-quarter angle inside the unified gothic border frame.)*
 
-2. **Rule-Breaking Evolution Traits (Data-Driven Capabilities)**:
-   - Because Basic (Stage 1) creatures follow strict defaults (attack only `FRONT`; vulnerable on `FLANK_LEFT`, `FLANK_RIGHT`, `REAR`; move only toward `FRONT`; fixed action order), while evolved forms and classes break those rules:
-     - **Attack Arcs**: Define allowed relative attack directions per creature stage (default `{FRONT}`, e.g. Hydra `{FRONT, FRONT_LEFT, FRONT_RIGHT}`).
-     - **Vulnerability Arcs**: Define vulnerable relative incoming-attack directions per creature stage (default `{FLANK_LEFT, FLANK_RIGHT, REAR}`).
-     - **Movement Directions & Rotations**: Separate **Rotations** (changing facing) from **Moves** (hex translation), and define allowed relative move directions per creature/class (default `{FRONT}`, overridden by Lizards and specific evolved forms).
-     - **Action Ordering**: Support flexible ordering of `Move` and `Attack` phases per turn for classes/forms that grant it (such as Lizards).
+2. **Rule-Breaking Evolution Traits (Data-Driven Capabilities on `CreatureSpec`)**:
+   - Rather than hardcoding movement or attack constraints, `rules.py` inspects per-creature attributes on `CreatureSpec`:
+     - **`num_rotate_moves`**: Number of `(Rotate -> Move)` cycles per turn (default `1` for Stage 1; up to `4` for Stage 8 `Tian Long`).
+     - **`max_rotate_per_move`**: Maximum `60°` hex faces (`0..3`) a creature can rotate away from its step-start facing in each cycle (default `1` for Stage 1; `3` for omnidirectional `180°` rotation).
+     - **`legal_move_dirs`**: Allowed relative move directions (`FORWARD`, `FORWARD_LEFT`, `FORWARD_RIGHT`, `FLANK_LEFT`, `FLANK_RIGHT`, `REAR`) relative to instantaneous facing at the moment of the move (default `{FORWARD}` for Stage 1).
+     - **`total_attacks_per_move` & Attack Junctures**: Total attacks allowed per turn (default `1`), taken at `BEFORE_ROTATE`, `AFTER_ROTATE`, or `AFTER_MOVE` junctures (at most 1 attack per juncture). Rotations, moves, and attacks are all optional.
+     - **`can_fly`**: Winged creatures may fly over occupied hexes on intermediate move steps provided they can land on an empty hex before their moves end.
+     - **Attack Arcs (`attack_arcs`) & Vulnerability Arcs (`vulnerable_arcs`)**: Relative offensive directions (default `{FORWARD}`, e.g. Hydra `{FORWARD, FORWARD_LEFT, FORWARD_RIGHT}`) and vulnerable incoming directions (default `{FLANK_LEFT, FLANK_RIGHT, REAR}`).
 
 3. **Evolution Progression Formula**:
    - Each class has **8 stages** (`1..8`).
