@@ -256,9 +256,124 @@ class GameState:
         return None
 
 
+def clone_game_state(state: GameState) -> GameState:
+    """
+    Create a fast, independent deep copy of `state` for X-ply lookahead search.
+    Reuses immutable `CreatureSpec` references while cloning all mutable `Unit`
+    and `GameState` fields.
+    """
+    cloned_units: Dict[str, Unit] = {}
+    for uid, u in state.units.items():
+        cloned_units[uid] = Unit(
+            unit_id=u.unit_id,
+            spec=u.spec,
+            team=u.team,
+            hex_pos=u.hex_pos,
+            facing=u.facing,
+            hp=u.hp,
+            battles_survived=u.battles_survived,
+            reserve_slot=u.reserve_slot,
+            current_step=u.current_step,
+            juncture=u.juncture,
+            step_start_facing=u.step_start_facing,
+            attacks_used=u.attacks_used,
+            attacked_at_current_juncture=u.attacked_at_current_juncture,
+            poison_stacks=u.poison_stacks,
+        )
+        # Preserve exact hp==0 for slain units (Unit.__post_init__ resets <=0 to max_hp)
+        cloned_units[uid].hp = u.hp
+        cloned_units[uid].step_start_facing = u.step_start_facing
+
+    return GameState(
+        arena_radius=state.arena_radius,
+        units=cloned_units,
+        phase=state.phase,
+        game_mode=state.game_mode,
+        round_number=state.round_number,
+        wave_budget=state.wave_budget,
+        active_team=state.active_team,
+        turn_number=state.turn_number,
+        selected_unit_id=state.selected_unit_id,
+        max_army_size=state.max_army_size,
+        reinforcements_per_round=state.reinforcements_per_round,
+        next_unit_seq=state.next_unit_seq,
+        enemy_ai_enabled=state.enemy_ai_enabled,
+        ai_acted_unit_ids=set(state.ai_acted_unit_ids),
+        evolution_records=list(state.evolution_records),
+        last_attack_results=list(state.last_attack_results),
+    )
+
+
 # ============================================================================
-# Army Setup & Lower-Half Battlefield Deployment Helpers
+# Army Setup & Battlefield Deployment Helpers (Player & Team-Symmetric)
 # ============================================================================
+
+def is_valid_team_deploy_hex(state: GameState, team: str, coord: HexCoord) -> bool:
+    """
+    Return True if `coord` is a legal deployment hex for `team` during PHASE_SETUP:
+      - `TEAM_PLAYER`: lower half (`2 * r + q > 0`)
+      - `TEAM_ENEMY`: upper half (`2 * r + q < 0`)
+    """
+    if not is_valid_hex(coord[0], coord[1], state.arena_radius):
+        return False
+    if team == TEAM_PLAYER:
+        if not is_lower_half_hex(coord):
+            return False
+    elif team == TEAM_ENEMY:
+        if not is_upper_half_hex(coord):
+            return False
+    else:
+        return False
+
+    occupant = state.get_unit_at_hex(coord)
+    if occupant is not None and occupant.team != team:
+        return False
+    return True
+
+
+def get_valid_team_deploy_hexes(state: GameState, team: str) -> List[HexCoord]:
+    """Return all 28 half-arena hexes where `team` may deploy creatures."""
+    return [
+        c
+        for c in get_all_arena_hexes(state.arena_radius)
+        if is_valid_team_deploy_hex(state, team, c)
+    ]
+
+
+def deploy_team_unit_to_hex(
+    state: GameState,
+    unit_id: str,
+    target_hex: HexCoord,
+    facing: Optional[int] = None,
+) -> bool:
+    """
+    Place or reposition a unit (`TEAM_PLAYER` in lower half or `TEAM_ENEMY` in upper half)
+    onto `target_hex` during `PHASE_SETUP` via shared rules validation.
+    """
+    if state.phase != PHASE_SETUP:
+        return False
+    unit = state.get_unit(unit_id)
+    if unit is None:
+        return False
+    if not is_valid_team_deploy_hex(state, unit.team, target_hex):
+        return False
+
+    old_hex = unit.hex_pos
+    existing = state.get_unit_at_hex(target_hex, exclude_unit_id=unit_id)
+    if existing is not None:
+        if existing.team != unit.team:
+            return False
+        existing.hex_pos = old_hex
+        existing.reset_for_turn()
+
+    unit.hex_pos = target_hex
+    if facing is not None:
+        unit.facing = facing % 6
+    elif old_hex is None:
+        unit.facing = FACING_N if unit.team == TEAM_PLAYER else FACING_S
+    unit.reset_for_turn()
+    return True
+
 
 def is_valid_player_deploy_hex(state: GameState, coord: HexCoord) -> bool:
     """
@@ -388,9 +503,13 @@ def complete_battle_to_evolution(state: GameState) -> bool:
     for u in survivors:
         old_spec = u.spec
         u.battles_survived += 1
-        new_stage = stage_for_battles_survived(u.battles_survived)
-        new_spec = get_creature_spec(old_spec.creature_class, new_stage)
-        leveled_up = new_spec.stage > old_spec.stage
+        if old_spec.creature_class in PLAYER_CLASSES:
+            new_stage = stage_for_battles_survived(u.battles_survived)
+            new_spec = get_creature_spec(old_spec.creature_class, new_stage)
+            leveled_up = new_spec.stage > old_spec.stage
+        else:
+            new_spec = old_spec
+            leveled_up = False
         u.spec = new_spec
         u.hp = new_spec.max_hp
         u.poison_stacks = 0
@@ -1388,35 +1507,35 @@ def _score_ai_state(
     can_attack_after: bool,
 ) -> float:
     """
-    Evaluate the tactical desirability of `(cand_hex, cand_facing)` for an Enemy Mammal unit.
-    Rewards closing distance to player reptiles, setting up high-damage/flank/rear attacks,
+    Evaluate the tactical desirability of `(cand_hex, cand_facing)` for a Classic AI unit.
+    Rewards closing distance to opposing units, setting up high-damage/flank/rear attacks,
     and orienting `FORWARD` toward nearby enemies to protect vulnerable flanks/rear.
     """
-    player_units = [
+    opp_units = [
         u
         for u in state.units.values()
-        if u.is_deployed and u.team == TEAM_PLAYER and u.hex_pos is not None
+        if u.is_deployed and u.team != unit.team and u.hex_pos is not None
     ]
-    if not player_units:
+    if not opp_units:
         return 0.0
 
-    # Nearest living player reptile (tie-break by lower HP, then higher point_cost)
-    nearest_pu = min(
-        player_units,
-        key=lambda pu: (
-            hex_distance(cand_hex, pu.hex_pos),  # type: ignore[arg-type]
-            pu.hp,
-            -pu.spec.point_cost,
+    # Nearest living opposing unit (tie-break by lower HP, then higher point_cost)
+    nearest_opp = min(
+        opp_units,
+        key=lambda ou: (
+            hex_distance(cand_hex, ou.hex_pos),  # type: ignore[arg-type]
+            ou.hp,
+            -ou.spec.point_cost,
         ),
     )
-    assert nearest_pu.hex_pos is not None
-    min_dist = hex_distance(cand_hex, nearest_pu.hex_pos)
+    assert nearest_opp.hex_pos is not None
+    min_dist = hex_distance(cand_hex, nearest_opp.hex_pos)
 
     # Prefer melee adjacency (min_dist == 1)
     score = -abs(min_dist - 1) * 38.0 - min_dist * 4.0
 
     # Slight tie-break preference for empty hexes over occupied fly-over hexes at equal distance,
-    # while still allowing flyers to cross occupied blockers to reduce distance to player units.
+    # while still allowing flyers to cross occupied blockers to reduce distance to opposing units.
     if state.get_unit_at_hex(cand_hex, exclude_unit_id=unit.unit_id) is not None:
         score -= 6.0
 
@@ -1426,28 +1545,28 @@ def _score_ai_state(
         if atk_score > 0.0:
             score += 500.0 + atk_score
 
-    # Orient facing toward the nearest player reptile
+    # Orient facing toward the nearest opposing unit
     best_dir_to_nearest = min(
         range(6),
         key=lambda d: hex_distance(
-            hex_neighbor(cand_hex, d), nearest_pu.hex_pos  # type: ignore[arg-type]
+            hex_neighbor(cand_hex, d), nearest_opp.hex_pos  # type: ignore[arg-type]
         ),
     )
     score -= hex_angle_distance(cand_facing, best_dir_to_nearest) * 8.0
 
-    # Flanking & defensive orientation around adjacent player units
-    for pu in player_units:
-        if pu.hex_pos is None:
+    # Flanking & defensive orientation around adjacent opposing units
+    for ou in opp_units:
+        if ou.hex_pos is None:
             continue
-        if hex_distance(cand_hex, pu.hex_pos) == 1:
-            # Threatening a player unit's vulnerable flank/rear
-            inc_on_pu = hex_direction_between(cand_hex, pu.hex_pos)
-            if inc_on_pu is not None:
-                rel_on_pu = relative_direction(pu.facing, inc_on_pu)
-                if rel_on_pu in pu.spec.vulnerable_arcs:
+        if hex_distance(cand_hex, ou.hex_pos) == 1:
+            # Threatening an opposing unit's vulnerable flank/rear
+            inc_on_opp = hex_direction_between(cand_hex, ou.hex_pos)
+            if inc_on_opp is not None:
+                rel_on_opp = relative_direction(ou.facing, inc_on_opp)
+                if rel_on_opp in ou.spec.vulnerable_arcs:
                     score += 14.0
-            # Avoid exposing our own vulnerable arcs to an adjacent player unit's attack arc
-            inc_on_us = hex_direction_between(pu.hex_pos, cand_hex)
+            # Avoid exposing our own vulnerable arcs to an adjacent opposing unit's attack arc
+            inc_on_us = hex_direction_between(ou.hex_pos, cand_hex)
             if inc_on_us is not None:
                 rel_on_us = relative_direction(cand_facing, inc_on_us)
                 if rel_on_us in unit.spec.vulnerable_arcs:
@@ -1456,46 +1575,52 @@ def _score_ai_state(
     return score
 
 
-def execute_next_ai_action(state: GameState) -> Optional[AIActionRecord]:
+def execute_next_ai_action(
+    state: GameState, allow_any_team: bool = False
+) -> Optional[AIActionRecord]:
     """
-    Execute a single atomic Enemy Mammal AI action (`rotate_unit`, `move_unit`,
+    Execute a single atomic Classic AI action (`rotate_unit`, `move_unit`,
     `execute_attack`, or `end_turn`) using ONLY shared `rules.py` helpers.
 
-    Returns an `AIActionRecord` describing the action taken, or `None` if not in
-    the Enemy team's battle turn.
+    When `allow_any_team` is False (default), only acts when `state.active_team == TEAM_ENEMY`.
+    When `allow_any_team` is True, acts for `state.active_team` (`TEAM_ENEMY` or `TEAM_PLAYER`),
+    allowing the Classic AI to play either side in headless arena benchmarks.
     """
-    if state.phase != PHASE_BATTLE or state.active_team != TEAM_ENEMY:
+    if state.phase != PHASE_BATTLE:
+        return None
+    if not allow_any_team and state.active_team != TEAM_ENEMY:
         return None
 
-    player_units = [
+    active_team = state.active_team
+    opp_units = [
         u
         for u in state.units.values()
-        if u.is_deployed and u.team == TEAM_PLAYER and u.hex_pos is not None
+        if u.is_deployed and u.team != active_team and u.hex_pos is not None
     ]
-    enemy_units = [
+    my_units = [
         u
         for u in state.units.values()
         if u.is_deployed
-        and u.team == TEAM_ENEMY
+        and u.team == active_team
         and u.hex_pos is not None
         and u.unit_id not in state.ai_acted_unit_ids
     ]
 
-    # Order enemy units front-to-back (closest to player army first)
-    if player_units:
-        enemy_units.sort(
-            key=lambda eu: (
+    # Order active team's units front-to-back (closest to opposing army first)
+    if opp_units:
+        my_units.sort(
+            key=lambda mu: (
                 min(
-                    hex_distance(eu.hex_pos, pu.hex_pos)  # type: ignore[arg-type]
-                    for pu in player_units
+                    hex_distance(mu.hex_pos, ou.hex_pos)  # type: ignore[arg-type]
+                    for ou in opp_units
                 ),
-                eu.unit_id,
+                mu.unit_id,
             )
         )
     else:
-        enemy_units.sort(key=lambda eu: eu.unit_id)
+        my_units.sort(key=lambda mu: mu.unit_id)
 
-    for unit in enemy_units:
+    for unit in my_units:
         assert unit.hex_pos is not None
         state.selected_unit_id = unit.unit_id
         attacks_left = unit.spec.total_attacks_per_move - unit.attacks_used
@@ -1658,16 +1783,21 @@ def execute_next_ai_action(state: GameState) -> Optional[AIActionRecord]:
     )
 
 
-def run_enemy_turn(state: GameState, max_actions: int = 250) -> List[AIActionRecord]:
+def run_enemy_turn(
+    state: GameState, max_actions: int = 250, allow_any_team: bool = False
+) -> List[AIActionRecord]:
     """
-    Execute the entire Enemy Mammal turn synchronously until control returns to
-    `TEAM_PLAYER` or the battle concludes (`PHASE_EVOLUTION` or `PHASE_DEFEAT`).
+    Execute the entire Classic AI turn synchronously until control passes to
+    the opposing team or the battle concludes (`PHASE_EVOLUTION` or `PHASE_DEFEAT`).
     """
+    starting_team = state.active_team
+    if not allow_any_team and starting_team != TEAM_ENEMY:
+        return []
     records: List[AIActionRecord] = []
     for _ in range(max_actions):
-        if state.phase != PHASE_BATTLE or state.active_team != TEAM_ENEMY:
+        if state.phase != PHASE_BATTLE or state.active_team != starting_team:
             break
-        rec = execute_next_ai_action(state)
+        rec = execute_next_ai_action(state, allow_any_team=allow_any_team)
         if rec is None:
             break
         records.append(rec)

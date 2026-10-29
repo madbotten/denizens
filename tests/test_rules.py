@@ -721,6 +721,130 @@ def test_splash_instructions_and_start_campaign_modes() -> None:
     assert rules.enemy_wave_budget(state) == 14
 
 
+def test_bot_genome_serialization_and_rule_compliant_setup() -> None:
+    """
+    Phase 1 (Bot Evolution Plan):
+      - `BotGenome` round-trips cleanly via `to_dict()` / `from_dict()` with all 13
+        Mammal species genes, setup genes, targeting genes, and 1..4-ply lookahead genes.
+      - `GeneticBotController.purchase_and_deploy_army` deploys legal armies on both
+        `TEAM_ENEMY` (upper half) and `TEAM_PLAYER` (lower half) within budget.
+    """
+    import random
+    import bots
+
+    rng = random.Random(2027)
+    genome = bots.create_random_genome(
+        rng=rng, bot_id="bot_test_1", name="Test Strain", generation=2
+    )
+    assert len(genome.mammal_genes) == 13
+    assert len(genome.setup.mammal_purchase_weights) == 13
+    assert genome.lookahead.lookahead_ply in (1, 2, 3, 4)
+
+    serialized = genome.to_dict()
+    restored = bots.BotGenome.from_dict(serialized)
+    assert restored.bot_id == "bot_test_1"
+    assert restored.name == "Test Strain"
+    assert restored.lookahead.lookahead_ply == genome.lookahead.lookahead_ply
+    assert restored.targeting.strong_vs_weak_bias == genome.targeting.strong_vs_weak_bias
+
+    state = rules.GameState(arena_radius=4, phase=rules.PHASE_SETUP, round_number=4)
+    ctrl_north = bots.GeneticBotController(restored)
+    ctrl_south = bots.LegacyBotController()
+
+    north_units = ctrl_north.purchase_and_deploy_army(
+        state, rules.TEAM_ENEMY, budget=18, rng=rng
+    )
+    south_units = ctrl_south.purchase_and_deploy_army(
+        state, rules.TEAM_PLAYER, budget=18, rng=rng
+    )
+
+    assert 1 <= len(north_units) <= rules.MAX_ARMY_SIZE
+    assert sum(u.spec.point_cost for u in north_units) <= 18
+    assert all(
+        u.hex_pos is not None and rules.is_valid_team_deploy_hex(state, rules.TEAM_ENEMY, u.hex_pos)
+        for u in north_units
+    )
+
+    assert 1 <= len(south_units) <= rules.MAX_ARMY_SIZE
+    assert sum(u.spec.point_cost for u in south_units) <= 18
+    assert all(
+        u.hex_pos is not None and rules.is_valid_team_deploy_hex(state, rules.TEAM_PLAYER, u.hex_pos)
+        for u in south_units
+    )
+
+
+def test_bot_2ply_lookahead_avoids_suicidal_lunge_and_records_telemetry() -> None:
+    """
+    Phase 1 (Bot Evolution Plan):
+      - A 1-ply bot (`lookahead_ply=1`) ignores the opponent's counter-turn response and
+        steps from distance 3 to distance 2 directly in front of a powerful 1-move enemy
+        Behemoth (entering its next-turn charge & maul range without being able to attack).
+      - A 2-ply bot (`lookahead_ply=2`) with the exact same genes simulates the Behemoth's
+        counter-turn response, sees the heavy counter-attack penalty in `DecisionTrace`,
+        and avoids stepping into the Behemoth's 1-move kill zone.
+    """
+    import bots
+
+    rat_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 1)       # 1 move, HP 8
+    behemoth_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 7)  # 2 moves, ATK 13
+
+    # Place our Rat at (0, -2) facing S, and an enemy Behemoth at (0, 1) facing N (distance 3).
+    # Wait: Behemoth has num_rotate_moves=2, so from (0, 1) it can move 2 hexes N to (0, -1) and attack (0, -2)!
+    # Let's use a 1-move Bear (stage 3, num_rotate_moves=1, ATK 7) at (0, 1) facing N!
+    # From (0, 1), the 1-move Bear can move to (0, 0) and attack (0, -1),
+    # bit CANNOT reach (0, -2) in 1 move!
+    bear_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 3)      # 1 move, ATK 7
+
+    # 1-Ply Bot test
+    state_1ply = rules.GameState(
+        arena_radius=4, phase=rules.PHASE_BATTLE, active_team=rules.TEAM_ENEMY
+    )
+    state_1ply.units["rat"] = rules.Unit(
+        "rat", rat_spec, rules.TEAM_ENEMY, (0, -2), rules.FACING_S, hp=6
+    )
+    state_1ply.units["bear"] = rules.Unit(
+        "bear", bear_spec, rules.TEAM_PLAYER, (0, 1), rules.FACING_N
+    )
+
+    g1 = bots.BotGenome(
+        bot_id="ply1",
+        name="Myopic 1-Ply",
+        lookahead=bots.LookaheadGenes(lookahead_ply=1, beam_width=3),
+    )
+    bot1 = bots.GeneticBotController(g1, record_telemetry=True)
+    bot1.run_turn(state_1ply)
+    # 1-ply bot blindly steps forward from (0, -2) to (0, -1) to reduce distance to Bear
+    assert state_1ply.units["rat"].hex_pos == (0, -1)
+    assert len(bot1.decision_traces) == 1
+    assert bot1.decision_traces[0].chosen_enemy_response_penalty == 0.0
+
+    # 2-Ply Bot test (identical genome except lookahead_ply=2)
+    state_2ply = rules.GameState(
+        arena_radius=4, phase=rules.PHASE_BATTLE, active_team=rules.TEAM_ENEMY
+    )
+    state_2ply.units["rat"] = rules.Unit(
+        "rat", rat_spec, rules.TEAM_ENEMY, (0, -2), rules.FACING_S, hp=6
+    )
+    state_2ply.units["bear"] = rules.Unit(
+        "bear", bear_spec, rules.TEAM_PLAYER, (0, 1), rules.FACING_N
+    )
+
+    g2 = bots.BotGenome(
+        bot_id="ply2",
+        name="Tactical 2-Ply",
+        lookahead=bots.LookaheadGenes(lookahead_ply=2, beam_width=3),
+    )
+    bot2 = bots.GeneticBotController(g2, record_telemetry=True)
+    bot2.run_turn(state_2ply)
+    # 2-ply bot sees that moving to (0, -1) allows the Bear at (0, 1) to step to (0, 0) and kill the 6-HP Rat!
+    assert state_2ply.units["rat"].hex_pos != (0, -1)
+    assert len(bot2.decision_traces) == 1
+    assert any(
+        c.enemy_response_penalty > 100.0 for c in bot2.decision_traces[0].top_candidates
+    )
+
+
+
 
 
 
