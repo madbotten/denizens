@@ -189,6 +189,9 @@ Turtle 8-Stage Lineup:
 
 6. CONTROLS & INTERFACE
 -----------------------
+  - Title Screen (Splash)    : Press I to View Instructions, 1 / B / Enter to
+                               Play Basic (adaptive waves), or 2 / A to Play
+                               Advanced (fixed mathematical wave schedule).
   - Drag-and-Drop (Setup)    : Drag reptiles from the Left Army Reserve Tray
                                (2x8 slots) onto the green lower half of the
                                battlefield (one per hex), or drag back to
@@ -211,5 +214,5 @@ Turtle 8-Stage Lineup:
                                AFTER_MOVE / AFTER_POST_ROTATE).
   - Space Key                : End player combat turn (triggers Enemy Mammal AI
                                turn).
-  - Enter / N Key (Defeat)   : Start a new Round 1 campaign if all player
-                               reptiles are slain.
+  - Enter / N / T (Defeat)   : Start a new Round 1 campaign (Enter / N) or return
+                               to the Title Screen (T) if all reptiles are slain.

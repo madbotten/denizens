@@ -47,7 +47,9 @@ from constants import (
     PHASE_BATTLE,
     PHASE_DEFEAT,
     PHASE_EVOLUTION,
+    PHASE_INSTRUCTIONS,
     PHASE_SETUP,
+    PHASE_SPLASH,
     PLAYER_CLASSES,
     REAR,
     REINFORCEMENTS_BASE,
@@ -1695,6 +1697,84 @@ def cycle_unit_stage(state: GameState, unit_id: str, delta: int) -> bool:
     return True
 
 
+def create_splash_game_state() -> GameState:
+    """Create the initial Pre-Game Splash & Title Screen state (`PHASE_SPLASH`)."""
+    return GameState(
+        arena_radius=ARENA_RADIUS,
+        phase=PHASE_SPLASH,
+        game_mode=GAME_MODE_BASIC,
+        round_number=1,
+        wave_budget=WAVE_BASE_POINTS,
+        active_team=TEAM_PLAYER,
+        turn_number=1,
+        max_army_size=MAX_ARMY_SIZE,
+        reinforcements_per_round=REINFORCEMENTS_BASE,
+    )
+
+
+def open_instructions(state: GameState) -> bool:
+    """Transition from `PHASE_SPLASH` to `PHASE_INSTRUCTIONS` (`View Instructions`)."""
+    if state.phase != PHASE_SPLASH:
+        return False
+    state.phase = PHASE_INSTRUCTIONS
+    return True
+
+
+def close_instructions(state: GameState) -> bool:
+    """Return from `PHASE_INSTRUCTIONS` to `PHASE_SPLASH`."""
+    if state.phase != PHASE_INSTRUCTIONS:
+        return False
+    state.phase = PHASE_SPLASH
+    return True
+
+
+def return_to_splash(state: GameState) -> bool:
+    """Return any active game state to the Pre-Game Splash Screen (`PHASE_SPLASH`)."""
+    state.units.clear()
+    state.evolution_records.clear()
+    state.last_attack_results.clear()
+    state.ai_acted_unit_ids.clear()
+    state.selected_unit_id = None
+    state.round_number = 1
+    state.turn_number = 1
+    state.active_team = TEAM_PLAYER
+    state.phase = PHASE_SPLASH
+    return True
+
+
+def start_campaign(
+    state: GameState,
+    game_mode: str = GAME_MODE_BASIC,
+    rng: Optional[random.Random] = None,
+) -> bool:
+    """
+    Start a new Round 1 campaign in `PHASE_SETUP` with the chosen `game_mode`
+    (`GAME_MODE_BASIC` for adaptive wave budgets or `GAME_MODE_ADVANCED` for fixed curve).
+    Mutates `state` in place so callers holding a reference to `state` see the new campaign.
+    """
+    if game_mode not in (GAME_MODE_BASIC, GAME_MODE_ADVANCED):
+        return False
+
+    fresh = create_initial_game_state(game_mode=game_mode, rng=rng)
+    state.arena_radius = fresh.arena_radius
+    state.phase = fresh.phase
+    state.game_mode = fresh.game_mode
+    state.round_number = fresh.round_number
+    state.wave_budget = fresh.wave_budget
+    state.active_team = fresh.active_team
+    state.turn_number = fresh.turn_number
+    state.max_army_size = fresh.max_army_size
+    state.reinforcements_per_round = fresh.reinforcements_per_round
+    state.next_unit_seq = fresh.next_unit_seq
+    state.units = fresh.units
+    state.selected_unit_id = fresh.selected_unit_id
+    state.evolution_records = fresh.evolution_records
+    state.last_attack_results = fresh.last_attack_results
+    state.enemy_ai_enabled = fresh.enemy_ai_enabled
+    state.ai_acted_unit_ids = fresh.ai_acted_unit_ids
+    return True
+
+
 def create_demo_battle() -> GameState:
-    """Create the default initial Round 1 game state in PHASE_SETUP."""
-    return create_initial_game_state(game_mode=GAME_MODE_BASIC)
+    """Create the default initial Pre-Game Splash Screen state (`PHASE_SPLASH`)."""
+    return create_splash_game_state()

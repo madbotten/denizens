@@ -52,9 +52,10 @@ class DenizensApp:
 
         # Pacing timer for visible step-by-step Enemy Mammal AI actions
         self.next_ai_step_ms: int = 0
+        self.instructions_scroll_y: int = 0
 
         self.status_message: str = (
-            "Round 1 Setup: Drag all 6 reptiles from the Left Reserve onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
+            "Welcome to Denizens! Choose View Instructions [I], Play Basic [1 / B / Enter], or Play Advanced [2 / A]."
         )
 
     def _report_attack_results(self, results: List[rules.AttackResult]) -> None:
@@ -88,7 +89,41 @@ class DenizensApp:
     def handle_action(self, action_id: str) -> None:
         """Dispatch UI/keyboard intent to shared `rules.py` helpers."""
         sel_id = self.state.selected_unit_id
-        if action_id == "rotate_ccw" and sel_id:
+        if action_id == "view_instructions":
+            if rules.open_instructions(self.state):
+                self.instructions_scroll_y = 0
+                self.status_message = (
+                    "Viewing Denizens Instructions & Evolution Compendium (denizens.txt). "
+                    "Use Mouse Wheel or Up/Down/PgUp/PgDn to scroll; press Esc or Enter to return."
+                )
+
+        elif action_id == "close_instructions":
+            if rules.close_instructions(self.state):
+                self.status_message = (
+                    "Welcome to Denizens! Choose View Instructions [I], Play Basic [1 / B / Enter], or Play Advanced [2 / A]."
+                )
+
+        elif action_id == "play_basic":
+            if rules.start_campaign(self.state, C.GAME_MODE_BASIC):
+                self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
+                self.status_message = (
+                    "Play Basic (Adaptive Waves) — Round 1 Setup: Drag all 6 reptiles from the Left Reserve onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
+                )
+
+        elif action_id == "play_advanced":
+            if rules.start_campaign(self.state, C.GAME_MODE_ADVANCED):
+                self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
+                self.status_message = (
+                    "Play Advanced (Fixed Curve) — Round 1 Setup: Drag all 6 reptiles from the Left Reserve onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
+                )
+
+        elif action_id == "return_to_splash":
+            if rules.return_to_splash(self.state):
+                self.status_message = (
+                    "Returned to Title Screen. Choose View Instructions [I], Play Basic [1 / B / Enter], or Play Advanced [2 / A]."
+                )
+
+        elif action_id == "rotate_ccw" and sel_id:
             if rules.rotate_unit_by_step(self.state, sel_id, -1):
                 u = self.state.get_unit(sel_id)
                 if u:
@@ -349,6 +384,58 @@ class DenizensApp:
                 return False
 
             elif event.type == pygame.KEYDOWN:
+                if self.state.phase == C.PHASE_SPLASH:
+                    if event.key == pygame.K_ESCAPE:
+                        return False
+                    elif event.key == pygame.K_i:
+                        self.handle_action("view_instructions")
+                    elif event.key in (
+                        pygame.K_1,
+                        pygame.K_KP1,
+                        pygame.K_b,
+                        pygame.K_RETURN,
+                        pygame.K_KP_ENTER,
+                    ):
+                        self.handle_action("play_basic")
+                    elif event.key in (pygame.K_2, pygame.K_KP2, pygame.K_a):
+                        self.handle_action("play_advanced")
+                    continue
+
+                if self.state.phase == C.PHASE_INSTRUCTIONS:
+                    max_sc = self.renderer.instructions_max_scroll
+                    if event.key in (
+                        pygame.K_ESCAPE,
+                        pygame.K_BACKSPACE,
+                        pygame.K_RETURN,
+                        pygame.K_KP_ENTER,
+                    ):
+                        self.handle_action("close_instructions")
+                    elif event.key in (pygame.K_1, pygame.K_KP1):
+                        self.handle_action("play_basic")
+                    elif event.key in (pygame.K_2, pygame.K_KP2):
+                        self.handle_action("play_advanced")
+                    elif event.key in (pygame.K_UP, pygame.K_w):
+                        self.instructions_scroll_y = max(
+                            0, self.instructions_scroll_y - 48
+                        )
+                    elif event.key in (pygame.K_DOWN, pygame.K_s):
+                        self.instructions_scroll_y = min(
+                            max_sc, self.instructions_scroll_y + 48
+                        )
+                    elif event.key == pygame.K_PAGEUP:
+                        self.instructions_scroll_y = max(
+                            0, self.instructions_scroll_y - 420
+                        )
+                    elif event.key in (pygame.K_PAGEDOWN, pygame.K_SPACE):
+                        self.instructions_scroll_y = min(
+                            max_sc, self.instructions_scroll_y + 420
+                        )
+                    elif event.key == pygame.K_HOME:
+                        self.instructions_scroll_y = 0
+                    elif event.key == pygame.K_END:
+                        self.instructions_scroll_y = max_sc
+                    continue
+
                 if event.key == pygame.K_ESCAPE:
                     return False
                 elif event.key in (pygame.K_q, pygame.K_LEFT):
@@ -364,6 +451,8 @@ class DenizensApp:
                         self.handle_action("new_game")
                 elif event.key == pygame.K_n and self.state.phase == C.PHASE_DEFEAT:
                     self.handle_action("new_game")
+                elif event.key == pygame.K_t and self.state.phase == C.PHASE_DEFEAT:
+                    self.handle_action("return_to_splash")
                 elif event.key in (pygame.K_BACKSPACE, pygame.K_DELETE):
                     if self.state.phase == C.PHASE_SETUP:
                         self.handle_action("undeploy_unit")
@@ -396,17 +485,24 @@ class DenizensApp:
                     self.camera.zoom_at(cx, C.SCREEN_HEIGHT * 0.5, 1.0 / 1.12)
 
             elif event.type == pygame.MOUSEWHEEL:
-                if C.ENABLE_CAMERA_ZOOM_PAN:
-                    mx, my = pygame.mouse.get_pos()
-                    if self._in_map_viewport(mx):
-                        factor = 1.10 if event.y > 0 else (1.0 / 1.10)
-                        self.camera.zoom_at(mx, my, factor)
-                else:
-                    # Mouse wheel rotates the selected creature 60° CW / CCW
-                    if event.y > 0:
-                        self.handle_action("rotate_cw")
-                    elif event.y < 0:
-                        self.handle_action("rotate_ccw")
+                if self.state.phase == C.PHASE_INSTRUCTIONS:
+                    max_sc = self.renderer.instructions_max_scroll
+                    self.instructions_scroll_y = max(
+                        0,
+                        min(max_sc, self.instructions_scroll_y - event.y * 48),
+                    )
+                elif self.state.phase in (C.PHASE_SETUP, C.PHASE_BATTLE):
+                    if C.ENABLE_CAMERA_ZOOM_PAN:
+                        mx, my = pygame.mouse.get_pos()
+                        if self._in_map_viewport(mx):
+                            factor = 1.10 if event.y > 0 else (1.0 / 1.10)
+                            self.camera.zoom_at(mx, my, factor)
+                    else:
+                        # Mouse wheel rotates the selected creature 60° CW / CCW
+                        if event.y > 0:
+                            self.handle_action("rotate_cw")
+                        elif event.y < 0:
+                            self.handle_action("rotate_ccw")
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
@@ -418,7 +514,12 @@ class DenizensApp:
                             clicked_button = True
                             break
                     if not clicked_button:
-                        if self.state.phase == C.PHASE_EVOLUTION and mx < C.SIDEBAR_X:
+                        if self.state.phase in (
+                            C.PHASE_SPLASH,
+                            C.PHASE_INSTRUCTIONS,
+                        ):
+                            pass
+                        elif self.state.phase == C.PHASE_EVOLUTION and mx < C.SIDEBAR_X:
                             uid = self.renderer.get_evolution_unit_at_pos(
                                 self.state, (mx, my)
                             )
@@ -547,6 +648,7 @@ class DenizensApp:
                 dragging_unit_id=self.dragging_unit_id,
                 is_dragging=self.is_dragging,
                 mouse_pos=mouse_pos,
+                instructions_scroll_y=self.instructions_scroll_y,
             )
             pygame.display.flip()
             self.clock.tick(60)

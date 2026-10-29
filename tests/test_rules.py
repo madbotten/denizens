@@ -669,5 +669,58 @@ def test_defeat_phase_when_all_player_reptiles_slain() -> None:
     assert state.phase == rules.PHASE_DEFEAT
 
 
+def test_splash_instructions_and_start_campaign_modes() -> None:
+    """
+    Phase 6:
+      - `create_demo_battle()` / `create_splash_game_state()` starts in `PHASE_SPLASH`.
+      - `open_instructions(state)` transitions `PHASE_SPLASH -> PHASE_INSTRUCTIONS`,
+        and `close_instructions(state)` returns `PHASE_INSTRUCTIONS -> PHASE_SPLASH`.
+      - `start_campaign(state, GAME_MODE_BASIC)` initializes Round 1 `PHASE_SETUP`
+        in Basic mode (adaptive waves), with 6 Stage 1 reptiles in Reserve and 4 Rats on the map.
+      - `start_campaign(state, GAME_MODE_ADVANCED)` initializes Round 1 `PHASE_SETUP`
+        in Advanced mode (fixed wave curve `4 + 3*(R-1) + (R-1)^2`), and in Round 3 its budget
+        is strictly `4 + 3*2 + 2^2 = 14` regardless of player casualties.
+    """
+    import random
+
+    rng = random.Random(99)
+    state = rules.create_demo_battle()
+    assert state.phase == rules.PHASE_SPLASH
+
+    # View Instructions flow
+    assert rules.open_instructions(state)
+    assert state.phase == rules.PHASE_INSTRUCTIONS
+    assert not rules.open_instructions(state)  # Already in instructions
+    assert rules.close_instructions(state)
+    assert state.phase == rules.PHASE_SPLASH
+
+    # Start Play Basic campaign
+    assert rules.start_campaign(state, rules.GAME_MODE_BASIC, rng=rng)
+    assert state.phase == rules.PHASE_SETUP
+    assert state.game_mode == rules.GAME_MODE_BASIC
+    assert state.round_number == 1
+    assert state.wave_budget == 4
+    assert len(state.get_player_army_units()) == rules.INITIAL_ARMY_SIZE
+
+    # Return to splash and start Play Advanced campaign
+    assert rules.return_to_splash(state)
+    assert state.phase == rules.PHASE_SPLASH
+    assert len(state.units) == 0
+
+    assert rules.start_campaign(state, rules.GAME_MODE_ADVANCED, rng=rng)
+    assert state.phase == rules.PHASE_SETUP
+    assert state.game_mode == rules.GAME_MODE_ADVANCED
+    assert state.round_number == 1
+    assert state.wave_budget == 4
+
+    # Even if only 1 Stage 1 reptile survives to Round 3, Advanced mode uses fixed schedule (14 pts)
+    player_ids = [u.unit_id for u in state.get_player_army_units()]
+    for uid in player_ids[1:]:
+        del state.units[uid]
+    state.round_number = 3
+    assert rules.enemy_wave_budget(state) == 14
+
+
+
 
 

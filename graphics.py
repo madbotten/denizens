@@ -126,7 +126,9 @@ class BattleRenderer:
         self.assets = assets
         self.camera = camera
 
+        self.font_hero = pygame.font.SysFont("georgia", 54, bold=True)
         self.font_title = pygame.font.SysFont("georgia", 24, bold=True)
+        self.font_splash_card = pygame.font.SysFont("georgia", 21, bold=True)
         self.font_subtitle = pygame.font.SysFont("georgia", 17, bold=True)
         self.font_body = pygame.font.SysFont("menlo", 14)
         self.font_small = pygame.font.SysFont("menlo", 12)
@@ -135,6 +137,15 @@ class BattleRenderer:
 
         self.buttons: List[UIButton] = []
         self.callouts: List[CombatCallout] = []
+        self.instructions_lines: List[str] = self._load_instructions_lines()
+        self.instructions_max_scroll: int = 0
+
+    def _load_instructions_lines(self) -> List[str]:
+        txt_path = os.path.join(self.assets.base_dir, "denizens.txt")
+        if not os.path.exists(txt_path):
+            return ["Instructions file (denizens.txt) not found."]
+        with open(txt_path, "r", encoding="utf-8") as fh:
+            return [line.rstrip("\n") for line in fh]
 
     def add_attack_callouts(self, results: List[rules.AttackResult]) -> None:
         """Spawn floating damage/status callouts for each target struck in an attack."""
@@ -233,10 +244,19 @@ class BattleRenderer:
         dragging_unit_id: Optional[str] = None,
         is_dragging: bool = False,
         mouse_pos: Tuple[int, int] = (0, 0),
+        instructions_scroll_y: int = 0,
     ) -> None:
         self.buttons.clear()
 
-        if state.phase == C.PHASE_SETUP:
+        if state.phase == C.PHASE_SPLASH:
+            self.draw_splash_screen(state, status_message)
+            self._draw_all_buttons()
+            return
+        elif state.phase == C.PHASE_INSTRUCTIONS:
+            self.draw_instructions_screen(state, instructions_scroll_y, status_message)
+            self._draw_all_buttons()
+            return
+        elif state.phase == C.PHASE_SETUP:
             self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
             self.draw_reserve_panel(
                 state,
@@ -268,6 +288,437 @@ class BattleRenderer:
 
         if is_dragging and dragging_unit_id is not None:
             self.draw_dragged_unit_ghost(state, dragging_unit_id, mouse_pos)
+
+    # ------------------------------------------------------------------------
+    # Pre-Game Splash Screen (`PHASE_SPLASH`) & Instructions (`PHASE_INSTRUCTIONS`)
+    # ------------------------------------------------------------------------
+
+    def draw_splash_screen(
+        self, state: rules.GameState, status_message: str
+    ) -> None:
+        """
+        Render the Pre-Game Splash & Title Screen (`PHASE_SPLASH`) with:
+          - Gothic portrait gallery showcasing apex Reptiles vs. Enemy Mammals
+          - View Instructions [I]
+          - Play Basic [1 / B / Enter] (adaptive wave point budgets)
+          - Play Advanced [2 / A] (fixed mathematical wave schedule)
+        """
+        self.screen.fill(C.COLOR_BG_VOID)
+
+        outer_rect = pygame.Rect(36, 24, C.SCREEN_WIDTH - 72, C.SCREEN_HEIGHT - 48)
+        pygame.draw.rect(self.screen, C.COLOR_PANEL_BG, outer_rect, border_radius=14)
+        pygame.draw.rect(
+            self.screen, C.COLOR_PANEL_BORDER, outer_rect, width=3, border_radius=14
+        )
+
+        # Title & Subtitle
+        title_surf = self.font_hero.render("D E N I Z E N S", True, C.COLOR_TEXT_GOLD)
+        self.screen.blit(
+            title_surf,
+            (C.SCREEN_WIDTH * 0.5 - title_surf.get_width() * 0.5, 48),
+        )
+
+        sub_surf = self.font_title.render(
+            "Cyclical Tactical Hex Warfare   •   Reptilian Evolution vs. Mammalian Waves",
+            True,
+            C.COLOR_TEXT_CYAN,
+        )
+        self.screen.blit(
+            sub_surf,
+            (C.SCREEN_WIDTH * 0.5 - sub_surf.get_width() * 0.5, 118),
+        )
+
+        desc_surf = self.font_body.render(
+            "Command persistent Serpents, Lizards, and Turtles across a 61-hex arena. "
+            "Surviving battles evolves your creatures through 8 stages — death is permanent.",
+            True,
+            C.COLOR_TEXT_MUTED,
+        )
+        self.screen.blit(
+            desc_surf,
+            (C.SCREEN_WIDTH * 0.5 - desc_surf.get_width() * 0.5, 156),
+        )
+
+        # Gothic Portrait Showcase Row
+        gallery_rect = pygame.Rect(68, 192, C.SCREEN_WIDTH - 136, 356)
+        pygame.draw.rect(self.screen, (18, 21, 27), gallery_rect, border_radius=10)
+        pygame.draw.rect(
+            self.screen, (66, 74, 88), gallery_rect, width=2, border_radius=10
+        )
+
+        left_hdr = self.font_subtitle.render(
+            "YOUR REPTILIAN LEGION  (3 Classes × 8 Evolution Stages)",
+            True,
+            C.COLOR_TEXT_GREEN,
+        )
+        self.screen.blit(left_hdr, (gallery_rect.x + 120, gallery_rect.y + 14))
+
+        right_hdr = self.font_subtitle.render(
+            "OPPOSING MAMMALIAN HORDE  (13 Point-Purchased Enemy Forms)",
+            True,
+            C.COLOR_TEXT_RED,
+        )
+        self.screen.blit(
+            right_hdr,
+            (gallery_rect.right - right_hdr.get_width() - 95, gallery_rect.y + 14),
+        )
+
+        portrait_px = 236
+        py = gallery_rect.y + 46
+
+        reptile_showcase = [
+            (creatures.get_creature_spec(C.CLASS_SERPENT, 8), "Serpent Stage 8"),
+            (creatures.get_creature_spec(C.CLASS_LIZARD, 8), "Lizard Stage 8"),
+            (creatures.get_creature_spec(C.CLASS_TURTLE, 8), "Turtle Stage 8"),
+        ]
+        for idx, (spec, tag) in enumerate(reptile_showcase):
+            px = gallery_rect.x + 48 + idx * (portrait_px + 34)
+            psurf = self.assets.get_portrait(spec.portrait_path, portrait_px)
+            self.screen.blit(psurf, (px, py))
+            pygame.draw.rect(
+                self.screen,
+                C.COLOR_PLAYER_RING,
+                pygame.Rect(px, py, portrait_px, portrait_px),
+                width=2,
+            )
+            lbl = self.font_badge.render(
+                f"{spec.name} ({tag})", True, C.COLOR_TEXT_GOLD
+            )
+            self.screen.blit(
+                lbl,
+                (px + portrait_px * 0.5 - lbl.get_width() * 0.5, py + portrait_px + 8),
+            )
+            sub_lbl = self.font_tiny.render(
+                f"HP {spec.max_hp} • ATK {spec.attack} • DEF {spec.defense} • {spec.point_cost} pts",
+                True,
+                C.COLOR_TEXT_MUTED,
+            )
+            self.screen.blit(
+                sub_lbl,
+                (
+                    px + portrait_px * 0.5 - sub_lbl.get_width() * 0.5,
+                    py + portrait_px + 28,
+                ),
+            )
+
+        # Center VS Emblem
+        vs_cx = gallery_rect.centerx
+        vs_cy = py + portrait_px // 2
+        pygame.draw.circle(self.screen, (34, 24, 28), (vs_cx, vs_cy), 44)
+        pygame.draw.circle(
+            self.screen, C.COLOR_TEXT_GOLD, (vs_cx, vs_cy), 44, width=3
+        )
+        vs_surf = self.font_title.render("VS", True, C.COLOR_TEXT_GOLD)
+        self.screen.blit(
+            vs_surf,
+            (vs_cx - vs_surf.get_width() * 0.5, vs_cy - vs_surf.get_height() * 0.5),
+        )
+
+        mammal_showcase = [
+            creatures.get_creature_spec(C.CLASS_MAMMAL, 8),   # Displacer Beast (11 pts)
+            creatures.get_creature_spec(C.CLASS_MAMMAL, 13),  # Hell Hound (19 pts)
+            creatures.get_creature_spec(C.CLASS_MAMMAL, 10),  # Rajang (22 pts)
+        ]
+        right_start_x = gallery_rect.right - 48 - (3 * portrait_px + 2 * 34)
+        for idx, spec in enumerate(mammal_showcase):
+            px = right_start_x + idx * (portrait_px + 34)
+            psurf = self.assets.get_portrait(spec.portrait_path, portrait_px)
+            self.screen.blit(psurf, (px, py))
+            pygame.draw.rect(
+                self.screen,
+                C.COLOR_ENEMY_RING,
+                pygame.Rect(px, py, portrait_px, portrait_px),
+                width=2,
+            )
+            lbl = self.font_badge.render(
+                f"{spec.name} ({spec.point_cost} pts)", True, C.COLOR_TEXT_RED
+            )
+            self.screen.blit(
+                lbl,
+                (px + portrait_px * 0.5 - lbl.get_width() * 0.5, py + portrait_px + 8),
+            )
+            sub_lbl = self.font_tiny.render(
+                f"HP {spec.max_hp} • ATK {spec.attack} • DEF {spec.defense} • Moves {spec.num_rotate_moves}",
+                True,
+                C.COLOR_TEXT_MUTED,
+            )
+            self.screen.blit(
+                sub_lbl,
+                (
+                    px + portrait_px * 0.5 - sub_lbl.get_width() * 0.5,
+                    py + portrait_px + 28,
+                ),
+            )
+
+        # Three Primary Mode & Instructions Cards
+        cards_y = 572
+        cards_h = 496
+        gap_x = 32
+        card_w = (gallery_rect.width - 2 * gap_x) // 3  # ~666px each
+
+        card_configs = [
+            {
+                "title": "VIEW INSTRUCTIONS",
+                "subtitle": "Complete Rules, Mechanics & Evolution Guide",
+                "title_col": C.COLOR_TEXT_CYAN,
+                "border_col": (70, 125, 165),
+                "bullets": [
+                    "• Overview of the 61-hex arena & persistent reptile army",
+                    "• 6 Hex Facings, Attack Arcs & Vulnerable Flanks/Rear",
+                    "• Reptilian Classes: Serpents, Lizards & Armored Turtles",
+                    "• 13 Enemy Mammal Wave Forms & Point Costs (1 to 22 pts)",
+                    "• Attribute-Driven Movement (num_rotate_moves, can_fly,",
+                    "  legal_move_dirs, post-move Lizard rotation)",
+                    "• Attack Junctures (BEFORE / AFTER_ROTATE / AFTER_MOVE)",
+                    "• 8-Stage Triangular Evolution Progression (0..28 battles)",
+                    "• Full Mouse & Keyboard Control Reference",
+                ],
+                "btn_label": "View Instructions [I]",
+                "action_id": "view_instructions",
+                "btn_color": (52, 108, 148),
+            },
+            {
+                "title": "PLAY BASIC  (ADAPTIVE WAVES)",
+                "subtitle": "Balanced Dynamic Wave Point Scaling",
+                "title_col": C.COLOR_TEXT_GREEN,
+                "border_col": (65, 150, 95),
+                "bullets": [
+                    "• Begin Round 1 with 6 random Stage 1 reptiles in Reserve",
+                    "• Round 1 opposes you with a 4-point Mammal wave (4 Rats)",
+                    "• Receive +4 new Stage 1 reptile reinforcements each round",
+                    "  (up to MAX_ARMY_SIZE = 16 units)",
+                    "• Adaptive Wave Budget: Each subsequent round scales the",
+                    "  computer opponent's Mammal point budget to your",
+                    "  surviving army's total point value",
+                    "• Guarantees a fair, tailored tactical challenge that",
+                    "  never snowballs out of reach after a costly battle",
+                ],
+                "btn_label": "Play Basic [1 / B / Enter]",
+                "action_id": "play_basic",
+                "btn_color": (56, 148, 92),
+            },
+            {
+                "title": "PLAY ADVANCED  (FIXED SCHEDULE)",
+                "subtitle": "Unforgiving Mathematical Escalation Curve",
+                "title_col": C.COLOR_TEXT_RED,
+                "border_col": (165, 72, 72),
+                "bullets": [
+                    "• Begin Round 1 with 6 random Stage 1 reptiles in Reserve",
+                    "• Receive +4 new Stage 1 reptile reinforcements each round",
+                    "• Unrelenting Fixed Wave Schedule:",
+                    "  Wave Budget(R) = 4 + 3*(R - 1) + (R - 1)^2",
+                    "  Round 1: 4 pts   •  Round 2: 8 pts   •  Round 3: 14 pts",
+                    "  Round 4: 22 pts  •  Round 5: 32 pts  •  Round 6: 44 pts",
+                    "• High-tier Mammals (Behemoth, Hell Hound, Rajang) arrive",
+                    "  on schedule regardless of your losses",
+                    "• Protect & evolve your veterans or be overrun!",
+                ],
+                "btn_label": "Play Advanced [2 / A]",
+                "action_id": "play_advanced",
+                "btn_color": (158, 62, 62),
+            },
+        ]
+
+        for idx, cfg in enumerate(card_configs):
+            cx = gallery_rect.x + idx * (card_w + gap_x)
+            crect = pygame.Rect(cx, cards_y, card_w, cards_h)
+            pygame.draw.rect(self.screen, C.COLOR_CARD_BG, crect, border_radius=12)
+            pygame.draw.rect(
+                self.screen, cfg["border_col"], crect, width=2, border_radius=12
+            )
+
+            ctitle = self.font_splash_card.render(
+                cfg["title"], True, cfg["title_col"]
+            )
+            self.screen.blit(
+                ctitle,
+                (crect.centerx - ctitle.get_width() * 0.5, crect.y + 20),
+            )
+
+            csub = self.font_subtitle.render(
+                cfg["subtitle"], True, C.COLOR_TEXT_GOLD
+            )
+            self.screen.blit(
+                csub,
+                (crect.centerx - csub.get_width() * 0.5, crect.y + 54),
+            )
+
+            pygame.draw.line(
+                self.screen,
+                (64, 72, 86),
+                (crect.x + 24, crect.y + 86),
+                (crect.right - 24, crect.y + 86),
+                width=1,
+            )
+
+            by = crect.y + 104
+            for b_line in cfg["bullets"]:
+                bsurf = self.font_body.render(b_line, True, C.COLOR_TEXT_MAIN)
+                self.screen.blit(bsurf, (crect.x + 26, by))
+                by += 32
+
+            btn_rect = pygame.Rect(
+                crect.x + 36, crect.bottom - 72, crect.width - 72, 52
+            )
+            self.buttons.append(
+                UIButton(
+                    btn_rect,
+                    cfg["btn_label"],
+                    cfg["action_id"],
+                    enabled=True,
+                    accent_color=cfg["btn_color"],
+                )
+            )
+
+        # Bottom Status Bar
+        status_rect = pygame.Rect(
+            gallery_rect.x, C.SCREEN_HEIGHT - 84, gallery_rect.width, 40
+        )
+        pygame.draw.rect(self.screen, (18, 22, 28), status_rect, border_radius=8)
+        pygame.draw.rect(
+            self.screen, (64, 74, 88), status_rect, width=1, border_radius=8
+        )
+        status_surf = self.font_body.render(status_message, True, C.COLOR_TEXT_GOLD)
+        self.screen.blit(status_surf, (status_rect.x + 18, status_rect.y + 11))
+
+    def draw_instructions_screen(
+        self, state: rules.GameState, scroll_y: int, status_message: str
+    ) -> None:
+        """
+        Render the interactive scrollable rules & evolution guide (`PHASE_INSTRUCTIONS`)
+        directly from `denizens.txt`.
+        """
+        self.screen.fill(C.COLOR_BG_VOID)
+
+        outer_rect = pygame.Rect(36, 20, C.SCREEN_WIDTH - 72, C.SCREEN_HEIGHT - 40)
+        pygame.draw.rect(self.screen, C.COLOR_PANEL_BG, outer_rect, border_radius=12)
+        pygame.draw.rect(
+            self.screen, C.COLOR_PANEL_BORDER, outer_rect, width=3, border_radius=12
+        )
+
+        # Header Bar
+        hdr_rect = pygame.Rect(60, 38, C.SCREEN_WIDTH - 120, 74)
+        pygame.draw.rect(self.screen, (18, 22, 28), hdr_rect, border_radius=8)
+        pygame.draw.rect(
+            self.screen, C.COLOR_PANEL_BORDER, hdr_rect, width=2, border_radius=8
+        )
+
+        title = self.font_title.render(
+            "DENIZENS — GAME INSTRUCTIONS & EVOLUTION GUIDE",
+            True,
+            C.COLOR_TEXT_GOLD,
+        )
+        self.screen.blit(title, (hdr_rect.x + 20, hdr_rect.y + 12))
+
+        hint = self.font_small.render(
+            "Scroll: Mouse Wheel / Up-Down / PgUp-PgDn / Home-End   •   Esc / Backspace / Enter: Back to Title Screen",
+            True,
+            C.COLOR_TEXT_MUTED,
+        )
+        self.screen.blit(hint, (hdr_rect.x + 20, hdr_rect.y + 46))
+
+        # Top-Right Navigation & Quick-Start Buttons
+        back_rect = pygame.Rect(hdr_rect.right - 740, hdr_rect.y + 15, 310, 44)
+        self.buttons.append(
+            UIButton(
+                back_rect,
+                "Back to Title Screen [Esc / Enter]",
+                "close_instructions",
+                enabled=True,
+                accent_color=(65, 115, 155),
+            )
+        )
+        basic_rect = pygame.Rect(hdr_rect.right - 416, hdr_rect.y + 15, 194, 44)
+        self.buttons.append(
+            UIButton(
+                basic_rect,
+                "Play Basic [1]",
+                "play_basic",
+                enabled=True,
+                accent_color=(56, 148, 92),
+            )
+        )
+        adv_rect = pygame.Rect(hdr_rect.right - 210, hdr_rect.y + 15, 194, 44)
+        self.buttons.append(
+            UIButton(
+                adv_rect,
+                "Play Advanced [2]",
+                "play_advanced",
+                enabled=True,
+                accent_color=(158, 62, 62),
+            )
+        )
+
+        # Scrollable Instructions Body Panel
+        body_rect = pygame.Rect(60, 126, C.SCREEN_WIDTH - 120, C.SCREEN_HEIGHT - 204)
+        pygame.draw.rect(self.screen, (16, 19, 24), body_rect, border_radius=8)
+        pygame.draw.rect(
+            self.screen, (64, 74, 88), body_rect, width=2, border_radius=8
+        )
+
+        line_h = 24
+        content_h = len(self.instructions_lines) * line_h + 40
+        view_h = body_rect.height - 24
+        self.instructions_max_scroll = max(0, content_h - view_h)
+        clamped_scroll = max(0, min(scroll_y, self.instructions_max_scroll))
+
+        clip_rect = pygame.Rect(
+            body_rect.x + 12, body_rect.y + 12, body_rect.width - 40, view_h
+        )
+        self.screen.set_clip(clip_rect)
+
+        y = clip_rect.y + 8 - clamped_scroll
+        for raw_line in self.instructions_lines:
+            if y + line_h >= clip_rect.y and y <= clip_rect.bottom:
+                stripped = raw_line.strip()
+                if stripped.startswith("==="):
+                    col = C.COLOR_TEXT_GOLD
+                elif stripped.startswith("---"):
+                    col = C.COLOR_PANEL_BORDER
+                elif (
+                    len(stripped) >= 3
+                    and stripped[0].isdigit()
+                    and stripped[1:3] == ". "
+                    and stripped.isupper()
+                ):
+                    col = C.COLOR_TEXT_GOLD
+                elif "DENIZENS" in stripped or "Game Overview" in stripped:
+                    col = C.COLOR_TEXT_CYAN
+                elif stripped.endswith(":") and not stripped.startswith("-"):
+                    col = C.COLOR_TEXT_CYAN
+                elif stripped.startswith("- "):
+                    col = C.COLOR_TEXT_GREEN
+                else:
+                    col = C.COLOR_TEXT_MAIN
+
+                lsurf = self.font_body.render(raw_line, True, col)
+                self.screen.blit(lsurf, (clip_rect.x + 28, y))
+            y += line_h
+
+        self.screen.set_clip(None)
+
+        # Scrollbar Track & Thumb
+        sb_track = pygame.Rect(
+            body_rect.right - 20, body_rect.y + 12, 10, view_h
+        )
+        pygame.draw.rect(self.screen, (28, 32, 40), sb_track, border_radius=5)
+        if self.instructions_max_scroll > 0:
+            thumb_h = max(36, int(view_h * (view_h / max(1, content_h))))
+            scroll_ratio = clamped_scroll / float(self.instructions_max_scroll)
+            thumb_y = sb_track.y + int((view_h - thumb_h) * scroll_ratio)
+            thumb_rect = pygame.Rect(sb_track.x, thumb_y, sb_track.width, thumb_h)
+            pygame.draw.rect(
+                self.screen, C.COLOR_TEXT_GOLD, thumb_rect, border_radius=5
+            )
+
+        # Bottom Status Bar
+        status_rect = pygame.Rect(60, C.SCREEN_HEIGHT - 68, C.SCREEN_WIDTH - 120, 34)
+        pygame.draw.rect(self.screen, (18, 22, 28), status_rect, border_radius=6)
+        pygame.draw.rect(
+            self.screen, (60, 70, 84), status_rect, width=1, border_radius=6
+        )
+        status_surf = self.font_body.render(status_message, True, C.COLOR_TEXT_GOLD)
+        self.screen.blit(status_surf, (status_rect.x + 16, status_rect.y + 8))
 
     # ------------------------------------------------------------------------
     # Pane 1: Left Army Reserve Panel (x = 0 .. 340)
@@ -710,7 +1161,7 @@ class BattleRenderer:
             sub2, (banner_rect.centerx - sub2.get_width() * 0.5, by + 114)
         )
 
-        btn_rect = pygame.Rect(banner_rect.centerx - 170, by + 158, 340, 46)
+        btn_rect = pygame.Rect(banner_rect.centerx - 295, by + 158, 310, 46)
         self.buttons.append(
             UIButton(
                 btn_rect,
@@ -718,6 +1169,16 @@ class BattleRenderer:
                 "new_game",
                 enabled=True,
                 accent_color=(155, 58, 58),
+            )
+        )
+        splash_btn_rect = pygame.Rect(banner_rect.centerx + 25, by + 158, 270, 46)
+        self.buttons.append(
+            UIButton(
+                splash_btn_rect,
+                "Title Screen [T]",
+                "return_to_splash",
+                enabled=True,
+                accent_color=(65, 105, 145),
             )
         )
 
@@ -1246,11 +1707,21 @@ class BattleRenderer:
             row1_y = y
             self.buttons.append(
                 UIButton(
-                    pygame.Rect(x0, row1_y, card_w, btn_h + 6),
+                    pygame.Rect(x0, row1_y, card_w, btn_h + 4),
                     "Start New Campaign [Enter / N]",
                     "new_game",
                     enabled=True,
                     accent_color=(155, 58, 58),
+                )
+            )
+            row2_y = row1_y + btn_h + 10
+            self.buttons.append(
+                UIButton(
+                    pygame.Rect(x0, row2_y, card_w, btn_h),
+                    "Return to Title Screen [T]",
+                    "return_to_splash",
+                    enabled=True,
+                    accent_color=(65, 105, 145),
                 )
             )
         else:
