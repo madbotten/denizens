@@ -212,3 +212,143 @@ def test_flying_over_opponent_requires_empty_landing_hex() -> None:
     assert rules.move_unit(state, "flyer", (0, -1))
     assert not rules.is_unit_overlapping(state, "flyer")
     assert rules.can_end_turn(state)
+
+
+def test_initial_game_state_army_and_round1_rats_wave() -> None:
+    """
+    Round 1 starts in PHASE_SETUP with 6 random Stage 1 reptiles in the left reserve tray
+    and 4 enemy Rats (budget = 4 pts @ 1 pt each) in the upper half of the battlefield.
+    """
+    import random
+
+    rng = random.Random(101)
+    state = rules.create_initial_game_state(game_mode=rules.GAME_MODE_BASIC, rng=rng)
+
+    assert state.phase == rules.PHASE_SETUP
+    assert state.round_number == 1
+    assert state.wave_budget == 4
+
+    player_units = state.get_player_army_units()
+    assert len(player_units) == rules.INITIAL_ARMY_SIZE == 6
+    for idx, pu in enumerate(player_units):
+        assert pu.in_reserve
+        assert not pu.is_deployed
+        assert pu.reserve_slot == idx
+        assert pu.spec.stage == 1
+        assert pu.spec.creature_class in rules.PLAYER_CLASSES
+        assert pu.spec.point_cost == 1
+
+    enemy_units = [u for u in state.units.values() if u.team == rules.TEAM_ENEMY]
+    assert len(enemy_units) == 4
+    for eu in enemy_units:
+        assert eu.is_deployed
+        assert eu.spec.name == "Rat"
+        assert eu.spec.point_cost == 1
+        assert eu.hex_pos is not None
+        assert rules.is_upper_half_hex(eu.hex_pos)
+        assert eu.facing == rules.FACING_S
+
+
+def test_lower_half_deployment_swap_undeploy_and_confirm() -> None:
+    """
+    During PHASE_SETUP, player units can be placed only in the 28 lower-half hexes (2*r + q > 0),
+    one per hex (swapping if occupied), undeployed back to reserve, and confirmed to start battle.
+    """
+    import random
+
+    state = rules.create_initial_game_state(rng=random.Random(7))
+    deploy_hexes = rules.get_valid_player_deploy_hexes(state)
+    assert len(deploy_hexes) == 28
+    assert (0, 2) in deploy_hexes
+    assert (0, 0) not in deploy_hexes
+    assert (0, -2) not in deploy_hexes
+
+    player_units = state.get_player_army_units()
+    u1, u2 = player_units[0], player_units[1]
+
+    # Cannot confirm deployment before at least 1 unit is placed on the board
+    assert not rules.can_confirm_deployment(state)
+    assert not rules.confirm_deployment(state)
+
+    # Cannot deploy into upper half or midline
+    assert not rules.deploy_unit_to_hex(state, u1.unit_id, (0, -2))
+    assert not rules.deploy_unit_to_hex(state, u1.unit_id, (0, 0))
+
+    # Deploy u1 to lower-half hex (0, 2) — still cannot confirm because 5 units remain in reserve
+    assert rules.deploy_unit_to_hex(state, u1.unit_id, (0, 2))
+    assert u1.is_deployed and u1.hex_pos == (0, 2)
+    assert not rules.can_confirm_deployment(state)
+
+    # Deploying u2 from reserve onto (0, 2) places u2 at (0, 2) and returns u1 to reserve
+    assert rules.deploy_unit_to_hex(state, u2.unit_id, (0, 2))
+    assert u2.hex_pos == (0, 2)
+    assert u1.in_reserve and u1.hex_pos is None
+
+    # Undeploy u2 back to reserve
+    assert rules.undeploy_unit_to_reserve(state, u2.unit_id)
+    assert u2.in_reserve
+    assert not rules.can_confirm_deployment(state)
+
+    # Deploy all 6 player units onto distinct lower-half hexes, rotate u1, and confirm deployment
+    for idx, pu in enumerate(player_units):
+        assert rules.deploy_unit_to_hex(state, pu.unit_id, deploy_hexes[idx])
+    assert rules.can_confirm_deployment(state)
+    assert rules.rotate_unit(state, u1.unit_id, rules.FACING_SW)
+    assert u1.facing == rules.FACING_SW
+    assert rules.confirm_deployment(state)
+    assert state.phase == rules.PHASE_BATTLE
+
+
+def test_base_reinforcements_and_max_army_cap() -> None:
+    """
+    grant_base_reinforcements adds REINFORCEMENTS_BASE (4) Stage 1 reptiles and caps at MAX_ARMY_SIZE (16).
+    """
+    import random
+
+    rng = random.Random(99)
+    state = rules.create_initial_game_state(rng=rng)
+    assert len(state.get_player_army_units()) == 6
+
+    added_1 = rules.grant_base_reinforcements(state, count=rules.REINFORCEMENTS_BASE, rng=rng)
+    assert len(added_1) == 4
+    assert len(state.get_player_army_units()) == 10
+
+    added_2 = rules.grant_base_reinforcements(state, count=rules.REINFORCEMENTS_BASE, rng=rng)
+    assert len(added_2) == 4
+    assert len(state.get_player_army_units()) == 14
+
+    # Next reinforcement grant can only add 2 units before hitting MAX_ARMY_SIZE = 16
+    added_3 = rules.grant_base_reinforcements(state, count=rules.REINFORCEMENTS_BASE, rng=rng)
+    assert len(added_3) == 2
+    assert len(state.get_player_army_units()) == rules.MAX_ARMY_SIZE == 16
+
+
+def test_wave_points_basic_adaptive_vs_advanced_schedule() -> None:
+    """
+    Advanced mode uses fixed schedule 4 + 3*(R-1) + (R-1)^2; Basic mode scales adaptively
+    to the player's surviving army points. Wave purchases respect budget and MAX_ARMY_SIZE.
+    """
+    import random
+
+    rng = random.Random(123)
+    state_adv = rules.create_initial_game_state(game_mode=rules.GAME_MODE_ADVANCED, rng=rng)
+    expected_adv = [4, 8, 14, 22, 32, 44]
+    for r, exp in enumerate(expected_adv, start=1):
+        state_adv.round_number = r
+        assert rules.enemy_wave_budget(state_adv) == exp
+
+    state_basic = rules.create_initial_game_state(game_mode=rules.GAME_MODE_BASIC, rng=rng)
+    state_basic.round_number = 4
+    # With 6 Stage 1 units (6 pts total), adaptive budget is modest
+    low_budget = rules.enemy_wave_budget(state_basic)
+    # Upgrade one unit to Stage 8 (24 pts) -> adaptive budget rises with player strength
+    u0 = state_basic.get_player_army_units()[0]
+    u0.spec = rules.get_creature_spec(rules.CLASS_LIZARD, 8)
+    high_budget = rules.enemy_wave_budget(state_basic)
+    assert high_budget > low_budget
+
+    # Purchasing a large wave never exceeds budget or MAX_ARMY_SIZE
+    wave = rules.purchase_enemy_wave(round_number=6, budget=85, max_units=rules.MAX_ARMY_SIZE, rng=rng)
+    assert 1 <= len(wave) <= rules.MAX_ARMY_SIZE
+    assert sum(s.point_cost for s in wave) <= 85
+

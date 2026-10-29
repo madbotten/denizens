@@ -1,5 +1,6 @@
 """
-Pygame asset caching, hex battlefield rendering, and gothic inspector UI for Denizens.
+Pygame asset caching, 3-pane layout (Left Army Reserve Tray, Center Hex Battlefield,
+and Right Gothic Inspector Sidebar), and drag-and-drop rendering for Denizens.
 """
 
 from __future__ import annotations
@@ -102,24 +103,62 @@ class UIButton:
 
 
 # ============================================================================
-# Battle Renderer (Hex Map Viewport & Gothic Inspector Sidebar)
+# Battle Renderer (Left Reserve Tray + Center Hex Map + Right Gothic Sidebar)
 # ============================================================================
 
 class BattleRenderer:
-    """Renders the 61-hex arena, unit sprites, tactical overlays, and sidebar inspector."""
+    """Renders the 2x8 Army Reserve Tray, 61-hex arena, unit sprites, and inspector."""
 
-    def __init__(self, screen: pygame.Surface, assets: AssetCache, camera: hexgrid.HexCamera) -> None:
+    def __init__(
+        self, screen: pygame.Surface, assets: AssetCache, camera: hexgrid.HexCamera
+    ) -> None:
         self.screen = screen
         self.assets = assets
         self.camera = camera
 
-        self.font_title = pygame.font.SysFont("georgia", 26, bold=True)
-        self.font_subtitle = pygame.font.SysFont("georgia", 18, bold=True)
+        self.font_title = pygame.font.SysFont("georgia", 24, bold=True)
+        self.font_subtitle = pygame.font.SysFont("georgia", 17, bold=True)
         self.font_body = pygame.font.SysFont("menlo", 14)
         self.font_small = pygame.font.SysFont("menlo", 12)
+        self.font_tiny = pygame.font.SysFont("menlo", 11)
         self.font_badge = pygame.font.SysFont("menlo", 13, bold=True)
 
         self.buttons: List[UIButton] = []
+
+    # ------------------------------------------------------------------------
+    # Reserve Slot Geometry (2 columns x 8 rows = 16 slots)
+    # ------------------------------------------------------------------------
+
+    def get_reserve_slot_rect(self, slot_idx: int) -> pygame.Rect:
+        """
+        Return the screen rectangle for `slot_idx` (0 .. MAX_ARMY_SIZE - 1)
+        arranged in 2 columns of 8 rows inside the Left Army Reserve Panel.
+        """
+        col = slot_idx // C.RESERVE_ROWS
+        row = slot_idx % C.RESERVE_ROWS
+        pad_x = 14
+        gap_x = 12
+        slot_w = (C.RESERVE_PANEL_WIDTH - 2 * pad_x - gap_x) // C.RESERVE_COLS  # 150px
+        top_y = 92
+        gap_y = 8
+        slot_h = 124
+        x = pad_x + col * (slot_w + gap_x)
+        y = top_y + row * (slot_h + gap_y)
+        return pygame.Rect(x, y, slot_w, slot_h)
+
+    def get_reserve_slot_at_pos(self, screen_pos: Tuple[int, int]) -> Optional[int]:
+        """Return the reserve slot index (0..15) at `screen_pos`, or None."""
+        mx, my = screen_pos
+        if mx < 0 or mx >= C.RESERVE_PANEL_WIDTH:
+            return None
+        for slot_idx in range(C.MAX_ARMY_SIZE):
+            if self.get_reserve_slot_rect(slot_idx).collidepoint(mx, my):
+                return slot_idx
+        return None
+
+    # ------------------------------------------------------------------------
+    # Master Frame Render
+    # ------------------------------------------------------------------------
 
     def draw_frame(
         self,
@@ -127,9 +166,164 @@ class BattleRenderer:
         arena_hexes: List[hexgrid.HexCoord],
         hovered_hex: Optional[hexgrid.HexCoord],
         status_message: str,
+        hovered_reserve_slot: Optional[int] = None,
+        dragging_unit_id: Optional[str] = None,
+        is_dragging: bool = False,
+        mouse_pos: Tuple[int, int] = (0, 0),
     ) -> None:
-        self.draw_map_viewport(state, arena_hexes, hovered_hex, status_message)
+        if state.phase == C.PHASE_SETUP:
+            self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
+            self.draw_reserve_panel(
+                state,
+                hovered_reserve_slot=hovered_reserve_slot,
+                dragging_unit_id=dragging_unit_id if is_dragging else None,
+            )
+        else:
+            # Left Reserve Panel goes away once deployment is confirmed (PHASE_BATTLE)
+            self.camera.set_viewport(0, C.SIDEBAR_X)
+
+        self.draw_map_viewport(
+            state,
+            arena_hexes,
+            hovered_hex,
+            status_message,
+            dragging_unit_id=dragging_unit_id if is_dragging else None,
+        )
         self.draw_sidebar(state, hovered_hex)
+
+        if is_dragging and dragging_unit_id is not None:
+            self.draw_dragged_unit_ghost(state, dragging_unit_id, mouse_pos)
+
+    # ------------------------------------------------------------------------
+    # Pane 1: Left Army Reserve Panel (x = 0 .. 340)
+    # ------------------------------------------------------------------------
+
+    def draw_reserve_panel(
+        self,
+        state: rules.GameState,
+        hovered_reserve_slot: Optional[int] = None,
+        dragging_unit_id: Optional[str] = None,
+    ) -> None:
+        panel_rect = pygame.Rect(0, 0, C.RESERVE_PANEL_WIDTH, C.SCREEN_HEIGHT)
+        pygame.draw.rect(self.screen, C.COLOR_PANEL_BG, panel_rect)
+        pygame.draw.line(
+            self.screen,
+            C.COLOR_PANEL_BORDER,
+            (C.RESERVE_PANEL_WIDTH - 2, 0),
+            (C.RESERVE_PANEL_WIDTH - 2, C.SCREEN_HEIGHT),
+            width=3,
+        )
+
+        # Header
+        title = self.font_title.render("ARMY RESERVE", True, C.COLOR_TEXT_GOLD)
+        self.screen.blit(title, (16, 16))
+
+        army_units = state.get_player_army_units()
+        deployed_count = sum(1 for u in army_units if u.is_deployed)
+        reserve_count = sum(1 for u in army_units if u.in_reserve)
+        army_pts = rules.calculate_player_army_points(state)
+
+        sub1 = self.font_small.render(
+            f"Roster: {len(army_units)}/{state.max_army_size}  •  Deployed: {deployed_count}",
+            True,
+            C.COLOR_TEXT_GREEN,
+        )
+        self.screen.blit(sub1, (16, 48))
+
+        sub2 = self.font_small.render(
+            f"Unplaced: {reserve_count}  •  Army Value: {army_pts} pts",
+            True,
+            C.COLOR_TEXT_MUTED,
+        )
+        self.screen.blit(sub2, (16, 66))
+
+        # 16 Slots (2 columns of 8 rows)
+        for slot_idx in range(C.MAX_ARMY_SIZE):
+            rect = self.get_reserve_slot_rect(slot_idx)
+            unit = state.get_unit_by_reserve_slot(slot_idx)
+            is_selected = unit is not None and unit.unit_id == state.selected_unit_id
+            is_hovered = slot_idx == hovered_reserve_slot
+
+            # Empty slot OR unit already dragged/deployed onto the board -> blank box
+            if unit is None or unit.is_deployed or unit.unit_id == dragging_unit_id:
+                pygame.draw.rect(self.screen, C.COLOR_SLOT_EMPTY, rect, border_radius=7)
+                pygame.draw.rect(
+                    self.screen, (44, 50, 60), rect, width=1, border_radius=7
+                )
+                continue
+
+            # Unplaced reserve unit in this slot
+            bg_col = (34, 40, 50) if not is_hovered else (42, 50, 62)
+            border_col = C.COLOR_TEXT_GOLD if is_selected else (84, 96, 114)
+            border_w = 3 if is_selected else (2 if is_hovered else 1)
+            pygame.draw.rect(self.screen, bg_col, rect, border_radius=7)
+            pygame.draw.rect(
+                self.screen, border_col, rect, width=border_w, border_radius=7
+            )
+
+            # Top row inside slot: Stage & Cost badge
+            stg_text = f"S{unit.spec.stage} • {unit.spec.point_cost}pt"
+            stg_surf = self.font_tiny.render(stg_text, True, C.COLOR_TEXT_GOLD)
+            self.screen.blit(stg_surf, (rect.x + 7, rect.y + 5))
+
+            hp_text = f"HP {unit.hp}"
+            hp_surf = self.font_tiny.render(hp_text, True, C.COLOR_TEXT_MUTED)
+            self.screen.blit(
+                hp_surf, (rect.right - hp_surf.get_width() - 7, rect.y + 5)
+            )
+
+            # Creature top-down sprite preview
+            sprite_size = 64
+            sprite = self.assets.get_topdown_sprite(
+                unit.spec.topdown_path, C.FACING_N, sprite_size
+            )
+            self.screen.blit(
+                sprite,
+                (
+                    rect.centerx - sprite.get_width() * 0.5,
+                    rect.y + 20,
+                ),
+            )
+
+            # Creature Name
+            name_str = unit.spec.name
+            if len(name_str) > 15:
+                name_str = name_str[:14] + "."
+            name_surf = self.font_small.render(name_str, True, C.COLOR_TEXT_MAIN)
+            self.screen.blit(
+                name_surf,
+                (rect.centerx - name_surf.get_width() * 0.5, rect.y + 84),
+            )
+
+            # Status tag
+            status_txt = "DRAG TO MAP" if state.phase == C.PHASE_SETUP else "IN RESERVE"
+            status_col = (
+                C.COLOR_TEXT_CYAN if state.phase == C.PHASE_SETUP else C.COLOR_TEXT_MUTED
+            )
+            st_surf = self.font_tiny.render(status_txt, True, status_col)
+            self.screen.blit(
+                st_surf,
+                (rect.centerx - st_surf.get_width() * 0.5, rect.y + 103),
+            )
+
+        # Bottom hint inside left panel
+        hint_txt = (
+            "Drag units to lower half of map"
+            if state.phase == C.PHASE_SETUP
+            else "Click any unit to inspect stats"
+        )
+        hint_surf = self.font_tiny.render(hint_txt, True, C.COLOR_TEXT_MUTED)
+        self.screen.blit(
+            hint_surf,
+            (
+                C.RESERVE_PANEL_WIDTH * 0.5 - hint_surf.get_width() * 0.5,
+                C.SCREEN_HEIGHT - 24,
+            ),
+        )
+
+    # ------------------------------------------------------------------------
+    # Pane 2: Center Hex Battlefield Viewport (x = 340 .. 1580)
+    # ------------------------------------------------------------------------
 
     def draw_map_viewport(
         self,
@@ -137,49 +331,68 @@ class BattleRenderer:
         arena_hexes: List[hexgrid.HexCoord],
         hovered_hex: Optional[hexgrid.HexCoord],
         status_message: str,
+        dragging_unit_id: Optional[str] = None,
     ) -> None:
-        viewport_rect = pygame.Rect(0, 0, C.MAP_VIEWPORT_WIDTH, C.SCREEN_HEIGHT)
+        viewport_rect = pygame.Rect(
+            self.camera.viewport_x, 0, self.camera.viewport_w, C.SCREEN_HEIGHT
+        )
         self.screen.set_clip(viewport_rect)
         self.screen.fill(C.COLOR_BG_VOID, viewport_rect)
 
         sel_unit = state.get_unit(state.selected_unit_id)
+        sel_deployed = sel_unit if (sel_unit is not None and sel_unit.is_deployed) else None
+
         legal_moves: List[hexgrid.HexCoord] = (
-            rules.get_legal_moves(state, sel_unit.unit_id) if sel_unit else []
+            rules.get_legal_moves(state, sel_deployed.unit_id) if sel_deployed else []
         )
         legal_rotations: List[int] = (
-            rules.get_legal_rotations(state, sel_unit.unit_id) if sel_unit else []
+            rules.get_legal_rotations(state, sel_deployed.unit_id) if sel_deployed else []
         )
         attack_arc_hexes: List[hexgrid.HexCoord] = (
-            rules.get_attack_arc_hexes(state, sel_unit.unit_id) if sel_unit else []
+            rules.get_attack_arc_hexes(state, sel_deployed.unit_id) if sel_deployed else []
         )
+
+        is_setup = state.phase == C.PHASE_SETUP
 
         # 1. Draw all 61 arena hexes
         for coord in arena_hexes:
             q, r = coord
             pts = self.camera.hex_polygon_points(coord, scale=0.98)
-            if coord == (0, 0):
+            in_deploy_zone = is_setup and rules.is_valid_player_deploy_hex(state, coord)
+
+            if in_deploy_zone:
+                fill_col = (
+                    C.COLOR_HEX_DEPLOY_A if (q - r) % 2 == 0 else C.COLOR_HEX_DEPLOY_B
+                )
+                border_col = C.COLOR_HEX_DEPLOY_BORDER
+            elif coord == (0, 0):
                 fill_col = C.COLOR_HEX_CENTER
+                border_col = C.COLOR_HEX_BORDER
             elif (q - r) % 2 == 0:
                 fill_col = C.COLOR_HEX_FILL_A
+                border_col = C.COLOR_HEX_BORDER
             else:
                 fill_col = C.COLOR_HEX_FILL_B
+                border_col = C.COLOR_HEX_BORDER
 
             pygame.draw.polygon(self.screen, fill_col, pts)
-            pygame.draw.polygon(self.screen, C.COLOR_HEX_BORDER, pts, width=2)
+            pygame.draw.polygon(self.screen, border_col, pts, width=2)
 
             if coord in attack_arc_hexes:
                 inner_pts = self.camera.hex_polygon_points(coord, scale=0.88)
                 pygame.draw.polygon(self.screen, C.COLOR_ATTACK_ARC, inner_pts, width=2)
 
-            if coord in legal_moves and sel_unit is not None:
-                occupant = state.get_unit_at_hex(coord, exclude_unit_id=sel_unit.unit_id)
-                hl_col = C.COLOR_LEGAL_FLY_OVER if occupant is not None else C.COLOR_LEGAL_MOVE
+            if coord in legal_moves and sel_deployed is not None and sel_deployed.hex_pos is not None:
+                occupant = state.get_unit_at_hex(coord, exclude_unit_id=sel_deployed.unit_id)
+                hl_col = (
+                    C.COLOR_LEGAL_FLY_OVER if occupant is not None else C.COLOR_LEGAL_MOVE
+                )
                 inner_pts = self.camera.hex_polygon_points(coord, scale=0.84)
                 pygame.draw.polygon(self.screen, hl_col, inner_pts, width=4)
 
-                abs_dir = hexgrid.hex_direction_between(sel_unit.hex_pos, coord)
+                abs_dir = hexgrid.hex_direction_between(sel_deployed.hex_pos, coord)
                 if abs_dir is not None and self.camera.zoom >= 0.70:
-                    rel_dir = hexgrid.relative_direction(sel_unit.facing, abs_dir)
+                    rel_dir = hexgrid.relative_direction(sel_deployed.facing, abs_dir)
                     tag = "FLY OVER" if occupant is not None else C.REL_DIR_NAMES[rel_dir]
                     lbl = self.font_small.render(tag, True, hl_col)
                     cx, cy = self.camera.hex_to_pixel(coord)
@@ -189,8 +402,16 @@ class BattleRenderer:
                     )
 
             if coord == hovered_hex:
-                hover_pts = self.camera.hex_polygon_points(coord, scale=0.95)
-                pygame.draw.polygon(self.screen, C.COLOR_HEX_HOVER, hover_pts, width=2)
+                hover_pts = self.camera.hex_polygon_points(coord, scale=0.94)
+                if dragging_unit_id is not None and is_setup:
+                    drag_col = (
+                        C.COLOR_LEGAL_MOVE
+                        if rules.is_valid_player_deploy_hex(state, coord)
+                        else C.COLOR_ATTACK_ARC
+                    )
+                    pygame.draw.polygon(self.screen, drag_col, hover_pts, width=4)
+                else:
+                    pygame.draw.polygon(self.screen, C.COLOR_HEX_HOVER, hover_pts, width=2)
 
             if C.DEBUG and self.camera.zoom >= 0.65:
                 cx, cy = self.camera.hex_to_pixel(coord)
@@ -200,31 +421,37 @@ class BattleRenderer:
                     (cx - coord_surf.get_width() * 0.5, cy - self.camera.hex_radius * 0.74),
                 )
 
-        # 2. Highlight selected unit's hex and its directional edges
-        if sel_unit is not None:
-            sel_pts = self.camera.hex_polygon_points(sel_unit.hex_pos, scale=0.95)
+        # 2. Highlight selected deployed unit's hex and its directional edges
+        if sel_deployed is not None and sel_deployed.hex_pos is not None:
+            sel_pts = self.camera.hex_polygon_points(sel_deployed.hex_pos, scale=0.95)
             pygame.draw.polygon(self.screen, C.COLOR_SELECTED_HEX, sel_pts, width=3)
 
-            for vuln_rel in sel_unit.spec.vulnerable_arcs:
-                abs_edge = hexgrid.absolute_direction(sel_unit.facing, vuln_rel)
-                p1, p2 = self.camera.hex_edge_endpoints(sel_unit.hex_pos, abs_edge, scale=0.88)
+            for vuln_rel in sel_deployed.spec.vulnerable_arcs:
+                abs_edge = hexgrid.absolute_direction(sel_deployed.facing, vuln_rel)
+                p1, p2 = self.camera.hex_edge_endpoints(
+                    sel_deployed.hex_pos, abs_edge, scale=0.88
+                )
                 pygame.draw.line(self.screen, C.COLOR_VULNERABLE_EDGE, p1, p2, width=4)
 
-            for atk_rel in sel_unit.spec.attack_arcs:
-                abs_edge = hexgrid.absolute_direction(sel_unit.facing, atk_rel)
-                p1, p2 = self.camera.hex_edge_endpoints(sel_unit.hex_pos, abs_edge, scale=0.88)
+            for atk_rel in sel_deployed.spec.attack_arcs:
+                abs_edge = hexgrid.absolute_direction(sel_deployed.facing, atk_rel)
+                p1, p2 = self.camera.hex_edge_endpoints(
+                    sel_deployed.hex_pos, abs_edge, scale=0.88
+                )
                 col = C.COLOR_FRONT_EDGE if atk_rel == C.FORWARD else C.COLOR_ATTACK_ARC
                 pygame.draw.line(self.screen, col, p1, p2, width=6)
 
             for rot_facing in legal_rotations:
-                if rot_facing == sel_unit.facing:
+                if rot_facing == sel_deployed.facing:
                     continue
-                p1, p2 = self.camera.hex_edge_endpoints(sel_unit.hex_pos, rot_facing, scale=0.76)
+                p1, p2 = self.camera.hex_edge_endpoints(
+                    sel_deployed.hex_pos, rot_facing, scale=0.76
+                )
                 mx = 0.5 * (p1[0] + p2[0])
                 my = 0.5 * (p1[1] + p2[1])
                 pygame.draw.circle(self.screen, C.COLOR_TEXT_GOLD, (int(mx), int(my)), 5)
 
-        # 3. Draw units on the board
+        # 3. Draw deployed units on the board
         sprite_px = int(self.camera.hex_radius * 1.62)
         for coord in arena_hexes:
             units_at_coord = state.get_units_at_hex(coord)
@@ -232,12 +459,18 @@ class BattleRenderer:
                 continue
             cx, cy = self.camera.hex_to_pixel(coord)
             for idx, unit in enumerate(units_at_coord):
+                if unit.unit_id == dragging_unit_id:
+                    continue
                 offset_x = 12 * idx
                 offset_y = -14 * idx
                 ux = cx + offset_x
                 uy = cy + offset_y
 
-                ring_col = C.COLOR_PLAYER_RING if unit.team == C.TEAM_PLAYER else C.COLOR_ENEMY_RING
+                ring_col = (
+                    C.COLOR_PLAYER_RING
+                    if unit.team == C.TEAM_PLAYER
+                    else C.COLOR_ENEMY_RING
+                )
                 ring_radius = int(self.camera.hex_radius * 0.64)
                 pygame.draw.circle(
                     self.screen, ring_col, (int(ux), int(uy)), ring_radius, width=3
@@ -247,7 +480,9 @@ class BattleRenderer:
                 tip_dist = ring_radius + 7
                 tip_x = ux + math.cos(facing_angle_rad) * tip_dist
                 tip_y = uy + math.sin(facing_angle_rad) * tip_dist
-                pygame.draw.circle(self.screen, C.COLOR_FRONT_EDGE, (int(tip_x), int(tip_y)), 5)
+                pygame.draw.circle(
+                    self.screen, C.COLOR_FRONT_EDGE, (int(tip_x), int(tip_y)), 5
+                )
 
                 sprite = self.assets.get_topdown_sprite(
                     unit.spec.topdown_path, unit.facing, sprite_px
@@ -266,50 +501,104 @@ class BattleRenderer:
                         lbl.get_height() + 2,
                     )
                     pygame.draw.rect(self.screen, (16, 18, 24), bg_rect, border_radius=4)
-                    pygame.draw.rect(self.screen, ring_col, bg_rect, width=1, border_radius=4)
+                    pygame.draw.rect(
+                        self.screen, ring_col, bg_rect, width=1, border_radius=4
+                    )
                     self.screen.blit(lbl, (bg_rect.x + 4, bg_rect.y + 1))
 
         self.draw_viewport_hud(state, status_message)
         self.screen.set_clip(None)
 
     def draw_viewport_hud(self, state: rules.GameState, status_message: str) -> None:
-        hud_rect = pygame.Rect(18, 16, 860, 74)
+        hud_x = self.camera.viewport_x + 18
+        hud_w = self.camera.viewport_w - 36
+        hud_rect = pygame.Rect(hud_x, 14, hud_w, 68)
         pygame.draw.rect(self.screen, (20, 24, 30), hud_rect, border_radius=8)
-        pygame.draw.rect(self.screen, C.COLOR_PANEL_BORDER, hud_rect, width=2, border_radius=8)
-
-        team_col = (
-            C.COLOR_TEXT_GREEN if state.active_team == C.TEAM_PLAYER else C.COLOR_TEXT_RED
+        pygame.draw.rect(
+            self.screen, C.COLOR_PANEL_BORDER, hud_rect, width=2, border_radius=8
         )
-        header = self.font_subtitle.render(
-            f"TURN {state.turn_number}  •  ACTIVE TEAM: {state.active_team.upper()}",
-            True,
-            team_col,
-        )
-        self.screen.blit(header, (32, 24))
 
-        controls_hint = self.font_small.render(
-            "L-Click: Select/Move  |  Wheel / Left-Right / Q-E / R-Click Adj Hex: Rotate  |  F: Attack  |  [/]: Stage  |  Space: End Turn",
-            True,
-            C.COLOR_TEXT_MUTED,
-        )
-        self.screen.blit(controls_hint, (32, 50))
+        if state.phase == C.PHASE_SETUP:
+            army_units = state.get_player_army_units()
+            deployed_cnt = sum(1 for u in army_units if u.is_deployed)
+            header_txt = (
+                f"ROUND {state.round_number} — ARMY SETUP PHASE   •   "
+                f"DEPLOYED: {deployed_cnt}/{len(army_units)}   •   "
+                f"ENEMY WAVE BUDGET: {state.wave_budget} PTS ({state.game_mode.upper()})"
+            )
+            header_col = C.COLOR_TEXT_GOLD
+            controls_txt = (
+                "Drag reptiles from Left Reserve onto lower-half green hexes  |  "
+                "Wheel / Q-E / Left-Right: Rotate  |  Enter: Confirm Deployment"
+            )
+        else:
+            team_col = (
+                C.COLOR_TEXT_GREEN
+                if state.active_team == C.TEAM_PLAYER
+                else C.COLOR_TEXT_RED
+            )
+            header_txt = (
+                f"ROUND {state.round_number}  •  TURN {state.turn_number}  •  "
+                f"ACTIVE TEAM: {state.active_team.upper()}  •  "
+                f"WAVE BUDGET: {state.wave_budget} PTS"
+            )
+            header_col = team_col
+            controls_txt = (
+                "L-Click: Select/Move  |  Wheel / Left-Right / Q-E / R-Click Adj Hex: Rotate  |  "
+                "F: Attack  |  Space: End Turn"
+            )
 
-        status_rect = pygame.Rect(18, C.SCREEN_HEIGHT - 48, C.MAP_VIEWPORT_WIDTH - 36, 34)
+        header = self.font_subtitle.render(header_txt, True, header_col)
+        self.screen.blit(header, (hud_x + 16, 22))
+
+        controls_hint = self.font_small.render(controls_txt, True, C.COLOR_TEXT_MUTED)
+        self.screen.blit(controls_hint, (hud_x + 16, 50))
+
+        status_rect = pygame.Rect(
+            hud_x, C.SCREEN_HEIGHT - 46, hud_w, 34
+        )
         pygame.draw.rect(self.screen, (20, 24, 30), status_rect, border_radius=6)
-        pygame.draw.rect(self.screen, (60, 70, 84), status_rect, width=1, border_radius=6)
+        pygame.draw.rect(
+            self.screen, (60, 70, 84), status_rect, width=1, border_radius=6
+        )
         status_surf = self.font_body.render(status_message, True, C.COLOR_TEXT_GOLD)
-        self.screen.blit(status_surf, (30, C.SCREEN_HEIGHT - 40))
+        self.screen.blit(status_surf, (hud_x + 14, C.SCREEN_HEIGHT - 38))
+
+    def draw_dragged_unit_ghost(
+        self,
+        state: rules.GameState,
+        dragging_unit_id: str,
+        mouse_pos: Tuple[int, int],
+    ) -> None:
+        unit = state.get_unit(dragging_unit_id)
+        if unit is None:
+            return
+        sprite_px = int(self.camera.hex_radius * 1.55)
+        sprite = self.assets.get_topdown_sprite(
+            unit.spec.topdown_path, unit.facing, sprite_px
+        )
+        ghost = sprite.copy()
+        ghost.fill((255, 255, 255, 215), special_flags=pygame.BLEND_RGBA_MULT)
+        mx, my = mouse_pos
+        self.screen.blit(
+            ghost,
+            (mx - ghost.get_width() * 0.5, my - ghost.get_height() * 0.5),
+        )
+
+    # ------------------------------------------------------------------------
+    # Pane 3: Right Gothic Portrait & Stat Inspector (x = 1580 .. 2200)
+    # ------------------------------------------------------------------------
 
     def draw_sidebar(
         self, state: rules.GameState, hovered_hex: Optional[hexgrid.HexCoord]
     ) -> None:
-        panel_rect = pygame.Rect(C.MAP_VIEWPORT_WIDTH, 0, C.SIDEBAR_WIDTH, C.SCREEN_HEIGHT)
+        panel_rect = pygame.Rect(C.SIDEBAR_X, 0, C.SIDEBAR_WIDTH, C.SCREEN_HEIGHT)
         pygame.draw.rect(self.screen, C.COLOR_PANEL_BG, panel_rect)
         pygame.draw.line(
             self.screen,
             C.COLOR_PANEL_BORDER,
-            (C.MAP_VIEWPORT_WIDTH, 0),
-            (C.MAP_VIEWPORT_WIDTH, C.SCREEN_HEIGHT),
+            (C.SIDEBAR_X, 0),
+            (C.SIDEBAR_X, C.SCREEN_HEIGHT),
             width=3,
         )
 
@@ -317,16 +606,18 @@ class BattleRenderer:
         if unit is None and hovered_hex is not None:
             unit = state.get_unit_at_hex(hovered_hex)
 
-        x0 = C.MAP_VIEWPORT_WIDTH + 24
-        y = 20
+        x0 = C.SIDEBAR_X + 24
+        y = 18
 
         title_surf = self.font_title.render("DENIZENS INSPECTOR", True, C.COLOR_TEXT_GOLD)
         self.screen.blit(title_surf, (x0, y))
-        y += 38
+        y += 36
 
         if unit is None:
             empty_msg = self.font_body.render(
-                "Click a creature on the hex arena to inspect.", True, C.COLOR_TEXT_MUTED
+                "Click any creature in Reserve or on the Map to inspect.",
+                True,
+                C.COLOR_TEXT_MUTED,
             )
             self.screen.blit(empty_msg, (x0, y + 40))
             return
@@ -334,8 +625,8 @@ class BattleRenderer:
         spec = unit.spec
 
         # 1. Framed Gothic Portrait
-        portrait_size = 380
-        px = C.MAP_VIEWPORT_WIDTH + (C.SIDEBAR_WIDTH - portrait_size) // 2
+        portrait_size = 370
+        px = C.SIDEBAR_X + (C.SIDEBAR_WIDTH - portrait_size) // 2
         portrait_surf = self.assets.get_portrait(spec.portrait_path, portrait_size)
         self.screen.blit(portrait_surf, (px, y))
         pygame.draw.rect(
@@ -344,12 +635,14 @@ class BattleRenderer:
             pygame.Rect(px, y, portrait_size, portrait_size),
             width=2,
         )
-        y += portrait_size + 14
+        y += portrait_size + 12
 
-        # 2. Creature Name, Class, Stage & Evolution Info
-        team_badge_col = C.COLOR_TEXT_GREEN if unit.team == C.TEAM_PLAYER else C.COLOR_TEXT_RED
+        # 2. Creature Name, Class, Stage, Point Cost & Evolution Info
+        team_badge_col = (
+            C.COLOR_TEXT_GREEN if unit.team == C.TEAM_PLAYER else C.COLOR_TEXT_RED
+        )
         if spec.creature_class in C.PLAYER_CLASSES:
-            stage_label = f"Stage {spec.stage}/8 {spec.creature_class.title()}"
+            stage_label = f"Stage {spec.stage}/8 {spec.creature_class.title()} • {spec.point_cost} pts"
             next_req = (
                 creatures.evolution_battles_required(spec.stage + 1)
                 if spec.stage < 8
@@ -361,30 +654,40 @@ class BattleRenderer:
                 else f"Battles Survived: {unit.battles_survived}  (MAX STAGE 8 APEX)"
             )
         else:
-            stage_label = f"Enemy Mammal #{spec.stage}/13 (Non-Evolving)"
-            evo_str = "Enemy Opposing Force"
+            stage_label = (
+                f"Enemy Mammal #{spec.stage}/13 • Cost: {spec.point_cost} pts"
+            )
+            evo_str = "Enemy Opposing Force (Non-Evolving)"
 
         name_surf = self.font_title.render(spec.name, True, C.COLOR_TEXT_MAIN)
         self.screen.blit(name_surf, (x0, y))
         badge_surf = self.font_badge.render(
             f"[{unit.team.upper()} • {stage_label}]", True, team_badge_col
         )
-        self.screen.blit(badge_surf, (x0 + name_surf.get_width() + 14, y + 6))
-        y += 32
+        self.screen.blit(badge_surf, (x0 + name_surf.get_width() + 12, y + 5))
+        y += 30
 
         evo_surf = self.font_body.render(evo_str, True, C.COLOR_TEXT_GOLD)
         self.screen.blit(evo_surf, (x0, y))
-        y += 26
+        y += 24
 
-        # 3. Turn Step & Juncture Status Card
+        # 3. Turn Step, Location & Juncture Status Card
         card_w = C.SIDEBAR_WIDTH - 48
         step_card = pygame.Rect(x0, y, card_w, 128)
         pygame.draw.rect(self.screen, C.COLOR_CARD_BG, step_card, border_radius=8)
-        pygame.draw.rect(self.screen, C.COLOR_PANEL_BORDER, step_card, width=1, border_radius=8)
+        pygame.draw.rect(
+            self.screen, C.COLOR_PANEL_BORDER, step_card, width=1, border_radius=8
+        )
 
         can_atk = rules.can_unit_attack_now(state, unit.unit_id)
         legal_rots = rules.get_legal_rotations(state, unit.unit_id)
         legal_mvs = rules.get_legal_moves(state, unit.unit_id)
+
+        if unit.in_reserve:
+            slot_num = (unit.reserve_slot + 1) if unit.reserve_slot is not None else 1
+            pos_str = f"Location: IN RESERVE (Slot #{slot_num})  •  Drag to lower half of map"
+        else:
+            pos_str = f"Hex Position: {unit.hex_pos}  •  Legal Destination Hexes: {len(legal_mvs)}"
 
         lines_step = [
             (
@@ -404,8 +707,8 @@ class BattleRenderer:
                 C.COLOR_TEXT_GREEN if can_atk else C.COLOR_TEXT_MUTED,
             ),
             (
-                f"Hex Position: {unit.hex_pos}  •  Legal Destination Hexes: {len(legal_mvs)}",
-                C.COLOR_TEXT_MAIN,
+                pos_str,
+                C.COLOR_TEXT_GOLD if unit.in_reserve else C.COLOR_TEXT_MAIN,
             ),
         ]
         cy_line = y + 10
@@ -421,20 +724,30 @@ class BattleRenderer:
         # 4. Creature Attributes & Capabilities Card
         attr_card = pygame.Rect(x0, y, card_w, 198)
         pygame.draw.rect(self.screen, C.COLOR_CARD_BG, attr_card, border_radius=8)
-        pygame.draw.rect(self.screen, (62, 70, 84), attr_card, width=1, border_radius=8)
+        pygame.draw.rect(
+            self.screen, (62, 70, 84), attr_card, width=1, border_radius=8
+        )
 
-        move_dir_names = ", ".join(C.REL_DIR_NAMES[d] for d in sorted(spec.legal_move_dirs))
-        atk_arc_names = ", ".join(C.REL_DIR_NAMES[d] for d in sorted(spec.attack_arcs))
+        move_dir_names = ", ".join(
+            C.REL_DIR_NAMES[d] for d in sorted(spec.legal_move_dirs)
+        )
+        atk_arc_names = ", ".join(
+            C.REL_DIR_NAMES[d] for d in sorted(spec.attack_arcs)
+        )
         vuln_arc_names = (
             ", ".join(C.REL_DIR_NAMES[d] for d in sorted(spec.vulnerable_arcs))
             if spec.vulnerable_arcs
             else "None (Armored All Sides)"
         )
-        powers_str = ", ".join(spec.special_powers) if spec.special_powers else "None (Basic Form)"
+        powers_str = (
+            ", ".join(spec.special_powers)
+            if spec.special_powers
+            else "None (Basic Form)"
+        )
 
         attr_lines = [
             (
-                f"Combat Stats:  HP {unit.hp}/{spec.max_hp}   •   ATK {spec.attack}   •   DEF {spec.defense}",
+                f"Combat Stats:  HP {unit.hp}/{spec.max_hp}   •   ATK {spec.attack}   •   DEF {spec.defense}   •   Cost {spec.point_cost}pt",
                 C.COLOR_TEXT_GOLD,
             ),
             (
@@ -455,16 +768,15 @@ class BattleRenderer:
             surf = self.font_small.render(text, True, col)
             self.screen.blit(surf, (x0 + 12, cy_line))
             cy_line += 26
-        y += 210
+        y += 208
 
-        # 5. Interactive Action & Debug Buttons
+        # 5. Interactive Action & Setup/Battle Buttons
         self.buttons.clear()
         btn_w = (card_w - 12) // 2
         btn_h = 40
 
-        is_active_team = unit.team == state.active_team
-        can_rot_ccw = is_active_team and ((unit.facing - 1) % 6 in legal_rots)
-        can_rot_cw = is_active_team and ((unit.facing + 1) % 6 in legal_rots)
+        can_rot_ccw = ((unit.facing - 1) % 6) in legal_rots
+        can_rot_cw = ((unit.facing + 1) % 6) in legal_rots
 
         row1_y = y
         self.buttons.append(
@@ -487,75 +799,45 @@ class BattleRenderer:
         )
 
         row2_y = row1_y + btn_h + 10
-        self.buttons.append(
-            UIButton(
-                pygame.Rect(x0, row2_y, btn_w, btn_h),
-                f"Attack ({unit.juncture[:10]}) [F]",
-                "juncture_attack",
-                enabled=can_atk,
-                accent_color=(165, 70, 65),
+        if state.phase == C.PHASE_SETUP:
+            can_undeploy = unit.team == C.TEAM_PLAYER and unit.is_deployed
+            self.buttons.append(
+                UIButton(
+                    pygame.Rect(x0, row2_y, btn_w, btn_h),
+                    "Return to Reserve [Bksp]",
+                    "undeploy_unit",
+                    enabled=can_undeploy,
+                    accent_color=(135, 85, 65),
+                )
             )
-        )
-        self.buttons.append(
-            UIButton(
-                pygame.Rect(x0 + btn_w + 12, row2_y, btn_w, btn_h),
-                "End Turn [Space]",
-                "end_turn",
-                enabled=rules.can_end_turn(state),
-                accent_color=(70, 140, 90),
+            self.buttons.append(
+                UIButton(
+                    pygame.Rect(x0 + btn_w + 12, row2_y, btn_w, btn_h),
+                    "Confirm Deployment [Enter]",
+                    "confirm_deployment",
+                    enabled=rules.can_confirm_deployment(state),
+                    accent_color=(60, 155, 95),
+                )
             )
-        )
-
-        row3_y = row2_y + btn_h + 10
-        if C.DEBUG:
-            if C.ENABLE_CAMERA_ZOOM_PAN:
-                third_w = (card_w - 24) // 3
-                self.buttons.append(
-                    UIButton(
-                        pygame.Rect(x0, row3_y, third_w, btn_h),
-                        "Prev Stage [[]",
-                        "prev_stage",
-                        enabled=True,
-                        accent_color=(115, 95, 60),
-                    )
+        else:
+            self.buttons.append(
+                UIButton(
+                    pygame.Rect(x0, row2_y, btn_w, btn_h),
+                    f"Attack ({unit.juncture[:10]}) [F]",
+                    "juncture_attack",
+                    enabled=can_atk,
+                    accent_color=(165, 70, 65),
                 )
-                self.buttons.append(
-                    UIButton(
-                        pygame.Rect(x0 + third_w + 12, row3_y, third_w, btn_h),
-                        "Next Stage []]",
-                        "next_stage",
-                        enabled=True,
-                        accent_color=(115, 95, 60),
-                    )
+            )
+            self.buttons.append(
+                UIButton(
+                    pygame.Rect(x0 + btn_w + 12, row2_y, btn_w, btn_h),
+                    "End Turn [Space]",
+                    "end_turn",
+                    enabled=rules.can_end_turn(state),
+                    accent_color=(70, 140, 90),
                 )
-                self.buttons.append(
-                    UIButton(
-                        pygame.Rect(x0 + (third_w + 12) * 2, row3_y, third_w, btn_h),
-                        "Reset Cam [C]",
-                        "reset_camera",
-                        enabled=True,
-                        accent_color=(80, 90, 110),
-                    )
-                )
-            else:
-                self.buttons.append(
-                    UIButton(
-                        pygame.Rect(x0, row3_y, btn_w, btn_h),
-                        "Prev Stage [[]",
-                        "prev_stage",
-                        enabled=True,
-                        accent_color=(115, 95, 60),
-                    )
-                )
-                self.buttons.append(
-                    UIButton(
-                        pygame.Rect(x0 + btn_w + 12, row3_y, btn_w, btn_h),
-                        "Next Stage []]",
-                        "next_stage",
-                        enabled=True,
-                        accent_color=(115, 95, 60),
-                    )
-                )
+            )
 
         mx, my = pygame.mouse.get_pos()
         for btn in self.buttons:
@@ -584,10 +866,10 @@ class BattleRenderer:
                 ),
             )
 
-        footer_y = C.SCREEN_HEIGHT - 28
+        footer_y = C.SCREEN_HEIGHT - 26
         footer_surf = self.font_small.render(
             f"DEBUG={C.DEBUG}  •  MAX_ARMY_SIZE={state.max_army_size}  •  "
-            f"REINFORCEMENTS_PER_ROUND={state.reinforcements_per_round}",
+            f"REINFORCEMENTS_BASE={state.reinforcements_per_round}",
             True,
             C.COLOR_TEXT_MUTED,
         )

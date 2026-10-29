@@ -7,9 +7,24 @@
 -------------------------------
 Denizens is a cyclical, turn-based tactical battle game played on a 61-hex
 flat-top hexagonal arena (radius 4). The player commands a persistent army of
-reptilian creatures (up to MAX_ARMY_SIZE = 16, receiving REINFORCEMENTS_PER_ROUND
-new Stage 1 creatures after each round) across a series of battles against
-mammalian enemies.
+reptilian creatures (starting with INITIAL_ARMY_SIZE = 6 random Stage 1 reptiles
+in Round 1, up to MAX_ARMY_SIZE = 16, and receiving REINFORCEMENTS_BASE = 4 new
+random Stage 1 reptiles after each round) across a series of battles against
+ever-stronger mammalian waves.
+
+Before each battle begins (Setup Phase), the player's available army appears in
+the Left Army Reserve Tray (2 columns of up to 8 creatures per column). The
+player drags and drops all of their reptiles onto the lower half of the
+battlefield (one per hex; no reserves may be left behind), orients them as
+desired, and clicks Confirm Deployment [Enter] to begin the battle (at which
+point the Left Reserve Tray closes). Clicking any creature—either in the Left
+Reserve Tray or on the battlefield—displays its Gothic Portrait and Stat
+Inspector card on the right.
+
+After each battle, the game enters the Evolution Phase, displaying the player's
+surviving reptiles (with leveled-up survivors shown in pairs: original form ->
+right arrow -> upgraded form, and non-leveled survivors shown by themselves)
+before returning to the Setup Phase for the next round.
 
 Surviving battles allows player creatures to evolve through 8 increasingly
 powerful and specialized stages. However, if a creature is slain in battle, its
@@ -60,22 +75,27 @@ tactical identity:
                          angles, multi-directional movement, and flight.
   3. Turtles           : High defense, low mobility armored tanks.
 
-Enemies (Mammals — Do Not Evolve):
-  - Opposing forces consist of 13 Mammal enemy forms encountered across the
-    cyclical battle progression:
-      1. Rat
-      2. Wolf
-      3. Bear
-      4. Lion
-      5. Griffon
-      6. Owlbear
-      7. Behemoth
-      8. Displacer Beast
-      9. Manticore
-     10. Rajang
-     11. Dire Wolf
-     12. Sabertooth
-     13. Hell Hound
+Enemies (Mammals — Points-Based Waves, Do Not Evolve):
+  - Opposing forces consist of 13 Mammal enemy forms purchased by the computer
+    opponent each wave using a point budget (up to MAX_ARMY_SIZE = 16 units).
+  - Round 1 starts with a 4-point wave budget (4 Rats at 1 pt each).
+  - In Play Basic mode, the enemy wave budget adapts to the player's surviving
+    army points so battles always challenge the player without overwhelming them.
+    In Play Advanced mode, the enemy wave budget follows a fixed mathematical
+    schedule (4 + 3*(R-1) + (R-1)^2) that punishes falling behind the curve:
+      1. Rat             (1 pt)
+      2. Wolf            (2 pts)
+      3. Bear            (4 pts)
+      4. Lion            (5 pts)
+      5. Griffon         (7 pts)
+      6. Owlbear         (9 pts)
+      7. Behemoth        (17 pts)
+      8. Displacer Beast (11 pts)
+      9. Manticore       (14 pts)
+     10. Rajang          (22 pts)
+     11. Dire Wolf       (12 pts)
+     12. Sabertooth      (15 pts)
+     13. Hell Hound      (19 pts)
 
 
 4. ATTRIBUTE-DRIVEN MOVEMENT, ROTATION, FLIGHT & ATTACK JUNCTURES
@@ -166,8 +186,14 @@ Turtle 8-Stage Lineup:
 
 6. CONTROLS & INTERFACE
 -----------------------
-  - Left-Click Unit          : Select unit and inspect its portrait, stats, and
-                               legal moves/rotations.
+  - Drag-and-Drop (Setup)    : Drag reptiles from the Left Army Reserve Tray
+                               (2x8 slots) onto the green lower half of the
+                               battlefield (one per hex), or drag back to
+                               the Left Reserve Tray to undeploy.
+  - Enter Key (Setup)        : Confirm Deployment and begin the battle.
+  - Backspace / Delete       : Return selected deployed unit to Reserve (Setup).
+  - Left-Click Unit          : Select any unit (in Left Reserve or on the map)
+                               to inspect its portrait, stats, and legal moves.
   - Wheel / Left-Right / Q-E : Rotate selected unit 60° counter-clockwise or
                                clockwise within max_rotate_per_move.
   - Right-Click Adjacent Hex : Rotate selected unit toward an adjacent hex.
@@ -176,5 +202,3 @@ Turtle 8-Stage Lineup:
   - F Key                    : Execute/test attack at current juncture
                                (BEFORE_ROTATE / AFTER_ROTATE / AFTER_MOVE).
   - Space Key                : End current team's turn.
-  - [ / ] Keys (DEBUG=True)  : Cycle selected unit's evolution stage (1..8) or
-                               Mammal enemy form (1..13).

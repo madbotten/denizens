@@ -27,7 +27,9 @@ class DenizensApp:
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
         self.assets = graphics.AssetCache(base_dir)
-        self.camera = hexgrid.HexCamera(C.MAP_VIEWPORT_WIDTH, C.SCREEN_HEIGHT)
+        self.camera = hexgrid.HexCamera(
+            C.MAP_VIEWPORT_WIDTH, C.SCREEN_HEIGHT, viewport_x=C.MAP_VIEWPORT_X
+        )
         self.renderer = graphics.BattleRenderer(self.screen, self.assets, self.camera)
 
         self.state: rules.GameState = rules.create_demo_battle()
@@ -36,12 +38,26 @@ class DenizensApp:
         )
 
         self.hovered_hex: Optional[hexgrid.HexCoord] = None
+        self.hovered_reserve_slot: Optional[int] = None
+
+        # Drag-and-drop state for PHASE_SETUP
+        self.dragging_unit_id: Optional[str] = None
+        self.drag_start_pos: Tuple[int, int] = (0, 0)
+        self.is_dragging: bool = False
+
+        # Optional camera pan state (when ENABLE_CAMERA_ZOOM_PAN=True)
         self.is_panning: bool = False
         self.pan_start_pos: Tuple[int, int] = (0, 0)
         self.pan_drag_distance: float = 0.0
+
         self.status_message: str = (
-            "Select a unit. Q/E rotates within max_rotate_per_move; Click green hex to move."
+            "Round 1 Setup: Drag all 6 reptiles from the Left Reserve onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
         )
+
+    def _in_map_viewport(self, mx: int) -> bool:
+        if self.state.phase == C.PHASE_SETUP:
+            return C.MAP_VIEWPORT_X <= mx < C.SIDEBAR_X
+        return 0 <= mx < C.SIDEBAR_X
 
     def handle_action(self, action_id: str) -> None:
         """Dispatch UI/keyboard intent to shared `rules.py` helpers."""
@@ -54,7 +70,7 @@ class DenizensApp:
                         f"{u.spec.name} rotated CCW to {C.ABS_FACING_NAMES[u.facing]} ({u.juncture})."
                     )
             else:
-                self.status_message = "Rotation CCW not legal from current step/juncture."
+                self.status_message = "Rotation CCW not legal right now (unit must be deployed and within rotation limit)."
 
         elif action_id == "rotate_cw" and sel_id:
             if rules.rotate_unit_by_step(self.state, sel_id, +1):
@@ -64,7 +80,32 @@ class DenizensApp:
                         f"{u.spec.name} rotated CW to {C.ABS_FACING_NAMES[u.facing]} ({u.juncture})."
                     )
             else:
-                self.status_message = "Rotation CW not legal from current step/juncture."
+                self.status_message = "Rotation CW not legal right now (unit must be deployed and within rotation limit)."
+
+        elif action_id == "undeploy_unit" and sel_id:
+            u = self.state.get_unit(sel_id)
+            if u and rules.undeploy_unit_to_reserve(self.state, sel_id):
+                self.status_message = f"Returned {u.spec.name} to the Army Reserve Tray."
+            else:
+                self.status_message = "Cannot return unit to reserve (only deployed player units during Setup Phase)."
+
+        elif action_id == "confirm_deployment":
+            if rules.confirm_deployment(self.state):
+                self.camera.set_viewport(0, C.SIDEBAR_X)
+                deployed_cnt = sum(
+                    1 for u in self.state.get_player_army_units() if u.is_deployed
+                )
+                self.status_message = (
+                    f"Battle Started! {deployed_cnt} reptiles deployed vs Enemy Wave ({self.state.wave_budget} pts). "
+                    f"Turn 1 — Active Team: {self.state.active_team.upper()}."
+                )
+            else:
+                unplaced_cnt = sum(
+                    1 for u in self.state.get_player_army_units() if u.in_reserve
+                )
+                self.status_message = (
+                    f"All reptiles in your army must be deployed before confirming! ({unplaced_cnt} still in Reserve)"
+                )
 
         elif action_id == "juncture_attack" and sel_id:
             u = self.state.get_unit(sel_id)
@@ -75,18 +116,6 @@ class DenizensApp:
                 )
             else:
                 self.status_message = "Cannot attack at this juncture (already attacked or limit reached)."
-
-        elif action_id == "prev_stage" and sel_id and C.DEBUG:
-            if rules.cycle_unit_stage(self.state, sel_id, -1):
-                u = self.state.get_unit(sel_id)
-                if u:
-                    self.status_message = f"Switched unit to Stage {u.spec.stage}: {u.spec.name}."
-
-        elif action_id == "next_stage" and sel_id and C.DEBUG:
-            if rules.cycle_unit_stage(self.state, sel_id, +1):
-                u = self.state.get_unit(sel_id)
-                if u:
-                    self.status_message = f"Switched unit to Stage {u.spec.stage}: {u.spec.name}."
 
         elif action_id == "end_turn":
             if rules.end_turn(self.state):
@@ -100,11 +129,58 @@ class DenizensApp:
             self.camera.reset()
             self.status_message = "Camera view reset to center."
 
-    def handle_map_left_click(self, screen_pos: Tuple[int, int]) -> None:
+    def handle_reserve_left_down(self, screen_pos: Tuple[int, int]) -> None:
+        slot_idx = self.renderer.get_reserve_slot_at_pos(screen_pos)
+        if slot_idx is None:
+            return
+        unit = self.state.get_unit_by_reserve_slot(slot_idx)
+        if unit is None or not unit.in_reserve:
+            return
+
+        self.state.selected_unit_id = unit.unit_id
+        self.status_message = (
+            f"Selected {unit.spec.name} (Stage {unit.spec.stage}, {unit.spec.point_cost} pts) in Reserve."
+        )
+
+        if self.state.phase == C.PHASE_SETUP:
+            self.dragging_unit_id = unit.unit_id
+            self.drag_start_pos = screen_pos
+            self.is_dragging = False
+
+    def handle_map_left_down(self, screen_pos: Tuple[int, int]) -> None:
         clicked_hex = self.camera.pixel_to_hex(screen_pos[0], screen_pos[1])
         if not hexgrid.is_valid_hex(clicked_hex[0], clicked_hex[1], self.state.arena_radius):
             return
 
+        if self.state.phase == C.PHASE_SETUP:
+            units_here = self.state.get_units_at_hex(clicked_hex)
+            if units_here:
+                chosen = units_here[-1]
+                self.state.selected_unit_id = chosen.unit_id
+                self.status_message = (
+                    f"Selected {chosen.spec.name} ({chosen.team.upper()}) at {clicked_hex}."
+                )
+                if chosen.team == C.TEAM_PLAYER:
+                    self.dragging_unit_id = chosen.unit_id
+                    self.drag_start_pos = screen_pos
+                    self.is_dragging = False
+                return
+
+            # If a reserve player unit is currently selected and user clicks an empty lower-half hex, deploy it
+            sel_unit = self.state.get_unit(self.state.selected_unit_id)
+            if (
+                sel_unit is not None
+                and sel_unit.team == C.TEAM_PLAYER
+                and sel_unit.in_reserve
+                and rules.is_valid_player_deploy_hex(self.state, clicked_hex)
+            ):
+                if rules.deploy_unit_to_hex(self.state, sel_unit.unit_id, clicked_hex):
+                    self.status_message = (
+                        f"Deployed {sel_unit.spec.name} to {clicked_hex}."
+                    )
+            return
+
+        # PHASE_BATTLE left click
         sel_id = self.state.selected_unit_id
         legal_moves = rules.get_legal_moves(self.state, sel_id) if sel_id else []
 
@@ -131,10 +207,42 @@ class DenizensApp:
                 f"Selected {chosen.spec.name} ({chosen.team.upper()}) at {clicked_hex}."
             )
 
+    def handle_left_mouse_up(self, screen_pos: Tuple[int, int]) -> None:
+        if (
+            self.state.phase == C.PHASE_SETUP
+            and self.dragging_unit_id is not None
+            and self.is_dragging
+        ):
+            mx, my = screen_pos
+            unit = self.state.get_unit(self.dragging_unit_id)
+            if unit is not None:
+                if self._in_map_viewport(mx):
+                    target_hex = self.camera.pixel_to_hex(mx, my)
+                    if rules.deploy_unit_to_hex(self.state, unit.unit_id, target_hex):
+                        self.state.selected_unit_id = unit.unit_id
+                        self.status_message = (
+                            f"Placed {unit.spec.name} on lower-half hex {target_hex}."
+                        )
+                    else:
+                        self.status_message = (
+                            "Invalid deployment hex! Place your reptiles in the green lower half of the battlefield."
+                        )
+                elif mx < C.MAP_VIEWPORT_X:
+                    target_slot = self.renderer.get_reserve_slot_at_pos((mx, my))
+                    if rules.undeploy_unit_to_reserve(
+                        self.state, unit.unit_id, preferred_slot=target_slot
+                    ):
+                        self.status_message = (
+                            f"Returned {unit.spec.name} to the Army Reserve Tray."
+                        )
+
+        self.dragging_unit_id = None
+        self.is_dragging = False
+
     def handle_map_right_click(self, screen_pos: Tuple[int, int]) -> None:
         sel_id = self.state.selected_unit_id
         unit = self.state.get_unit(sel_id)
-        if unit is None:
+        if unit is None or unit.hex_pos is None:
             return
         clicked_hex = self.camera.pixel_to_hex(screen_pos[0], screen_pos[1])
         target_dir = hexgrid.hex_direction_between(unit.hex_pos, clicked_hex)
@@ -161,34 +269,37 @@ class DenizensApp:
                     self.handle_action("rotate_ccw")
                 elif event.key in (pygame.K_e, pygame.K_RIGHT):
                     self.handle_action("rotate_cw")
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    if self.state.phase == C.PHASE_SETUP:
+                        self.handle_action("confirm_deployment")
+                elif event.key in (pygame.K_BACKSPACE, pygame.K_DELETE):
+                    if self.state.phase == C.PHASE_SETUP:
+                        self.handle_action("undeploy_unit")
                 elif event.key == pygame.K_f:
                     self.handle_action("juncture_attack")
                 elif event.key == pygame.K_SPACE:
-                    self.handle_action("end_turn")
+                    if self.state.phase == C.PHASE_BATTLE:
+                        self.handle_action("end_turn")
                 elif event.key in (pygame.K_c, pygame.K_HOME):
                     self.handle_action("reset_camera")
-                elif event.key == pygame.K_LEFTBRACKET and C.DEBUG:
-                    self.handle_action("prev_stage")
-                elif event.key == pygame.K_RIGHTBRACKET and C.DEBUG:
-                    self.handle_action("next_stage")
                 elif C.ENABLE_CAMERA_ZOOM_PAN and event.key in (
                     pygame.K_EQUALS,
                     pygame.K_PLUS,
                     pygame.K_KP_PLUS,
                 ):
-                    self.camera.zoom_at(C.MAP_VIEWPORT_WIDTH * 0.5, C.SCREEN_HEIGHT * 0.5, 1.12)
+                    cx = C.MAP_VIEWPORT_X + C.MAP_VIEWPORT_WIDTH * 0.5
+                    self.camera.zoom_at(cx, C.SCREEN_HEIGHT * 0.5, 1.12)
                 elif C.ENABLE_CAMERA_ZOOM_PAN and event.key in (
                     pygame.K_MINUS,
                     pygame.K_KP_MINUS,
                 ):
-                    self.camera.zoom_at(
-                        C.MAP_VIEWPORT_WIDTH * 0.5, C.SCREEN_HEIGHT * 0.5, 1.0 / 1.12
-                    )
+                    cx = C.MAP_VIEWPORT_X + C.MAP_VIEWPORT_WIDTH * 0.5
+                    self.camera.zoom_at(cx, C.SCREEN_HEIGHT * 0.5, 1.0 / 1.12)
 
             elif event.type == pygame.MOUSEWHEEL:
                 if C.ENABLE_CAMERA_ZOOM_PAN:
                     mx, my = pygame.mouse.get_pos()
-                    if mx < C.MAP_VIEWPORT_WIDTH:
+                    if self._in_map_viewport(mx):
                         factor = 1.10 if event.y > 0 else (1.0 / 1.10)
                         self.camera.zoom_at(mx, my, factor)
                 else:
@@ -201,29 +312,56 @@ class DenizensApp:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 if event.button == 1:
-                    if mx >= C.MAP_VIEWPORT_WIDTH:
+                    if self.state.phase == C.PHASE_SETUP and mx < C.MAP_VIEWPORT_X:
+                        self.handle_reserve_left_down((mx, my))
+                    elif mx >= C.SIDEBAR_X:
                         for btn in self.renderer.buttons:
                             if btn.enabled and btn.rect.collidepoint(mx, my):
                                 self.handle_action(btn.action_id)
                                 break
                     else:
-                        self.handle_map_left_click((mx, my))
-                elif event.button == 3 and mx < C.MAP_VIEWPORT_WIDTH and not C.ENABLE_CAMERA_ZOOM_PAN:
+                        self.handle_map_left_down((mx, my))
+                elif (
+                    event.button == 3
+                    and self._in_map_viewport(mx)
+                    and not C.ENABLE_CAMERA_ZOOM_PAN
+                ):
                     self.handle_map_right_click((mx, my))
-                elif C.ENABLE_CAMERA_ZOOM_PAN and event.button in (2, 3) and mx < C.MAP_VIEWPORT_WIDTH:
+                elif (
+                    C.ENABLE_CAMERA_ZOOM_PAN
+                    and event.button in (2, 3)
+                    and self._in_map_viewport(mx)
+                ):
                     self.is_panning = True
                     self.pan_start_pos = (mx, my)
                     self.pan_drag_distance = 0.0
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 mx, my = event.pos
-                if C.ENABLE_CAMERA_ZOOM_PAN and event.button in (2, 3) and self.is_panning:
+                if event.button == 1:
+                    self.handle_left_mouse_up((mx, my))
+                elif (
+                    C.ENABLE_CAMERA_ZOOM_PAN
+                    and event.button in (2, 3)
+                    and self.is_panning
+                ):
                     self.is_panning = False
-                    if event.button == 3 and self.pan_drag_distance < 6.0 and mx < C.MAP_VIEWPORT_WIDTH:
+                    if (
+                        event.button == 3
+                        and self.pan_drag_distance < 6.0
+                        and self._in_map_viewport(mx)
+                    ):
                         self.handle_map_right_click((mx, my))
 
             elif event.type == pygame.MOUSEMOTION:
                 mx, my = event.pos
+                if self.dragging_unit_id is not None and not self.is_dragging:
+                    dist = math.hypot(
+                        mx - self.drag_start_pos[0], my - self.drag_start_pos[1]
+                    )
+                    if dist >= 6.0:
+                        self.is_dragging = True
+
                 if C.ENABLE_CAMERA_ZOOM_PAN and self.is_panning:
                     dx = mx - self.pan_start_pos[0]
                     dy = my - self.pan_start_pos[1]
@@ -231,10 +369,18 @@ class DenizensApp:
                     self.camera.pan(dx, dy)
                     self.pan_start_pos = (mx, my)
 
-                if mx < C.MAP_VIEWPORT_WIDTH:
+                self.hovered_reserve_slot = self.renderer.get_reserve_slot_at_pos(
+                    (mx, my)
+                )
+
+                if self._in_map_viewport(mx):
                     cand = self.camera.pixel_to_hex(mx, my)
                     self.hovered_hex = (
-                        cand if hexgrid.is_valid_hex(cand[0], cand[1], self.state.arena_radius) else None
+                        cand
+                        if hexgrid.is_valid_hex(
+                            cand[0], cand[1], self.state.arena_radius
+                        )
+                        else None
                     )
                 else:
                     self.hovered_hex = None
@@ -257,8 +403,16 @@ class DenizensApp:
         running = True
         while running:
             running = self.process_events()
+            mouse_pos = pygame.mouse.get_pos()
             self.renderer.draw_frame(
-                self.state, self.arena_hexes, self.hovered_hex, self.status_message
+                self.state,
+                self.arena_hexes,
+                self.hovered_hex,
+                self.status_message,
+                hovered_reserve_slot=self.hovered_reserve_slot,
+                dragging_unit_id=self.dragging_unit_id,
+                is_dragging=self.is_dragging,
+                mouse_pos=mouse_pos,
             )
             pygame.display.flip()
             self.clock.tick(60)

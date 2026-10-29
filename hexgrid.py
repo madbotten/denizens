@@ -33,6 +33,25 @@ def get_all_arena_hexes(radius: int = ARENA_RADIUS) -> List[HexCoord]:
     return hexes
 
 
+def is_lower_half_hex(coord: HexCoord) -> bool:
+    """
+    Return True if `coord` lies strictly in the lower (southern) half of the flat-top arena.
+    In flat-top axial geometry, vertical screen offset is proportional to `r + q / 2`,
+    so `2 * r + q > 0` defines the 28 southern hexes.
+    """
+    q, r = coord
+    return (2 * r + q) > 0
+
+
+def is_upper_half_hex(coord: HexCoord) -> bool:
+    """
+    Return True if `coord` lies strictly in the upper (northern) half of the flat-top arena
+    (`2 * r + q < 0`, 28 northern hexes).
+    """
+    q, r = coord
+    return (2 * r + q) < 0
+
+
 def hex_distance(a: HexCoord, b: HexCoord) -> int:
     """Compute grid distance between two axial hex coordinates."""
     dq = a[0] - b[0]
@@ -78,14 +97,15 @@ def hex_angle_distance(facing_a: int, facing_b: int) -> int:
 class HexCamera:
     """Manages zoom and pan transformations between flat-top axial hexes and screen pixels."""
 
-    def __init__(self, viewport_w: int, viewport_h: int) -> None:
+    def __init__(self, viewport_w: int, viewport_h: int, viewport_x: int = 0) -> None:
+        self.viewport_x = viewport_x
         self.viewport_w = viewport_w
         self.viewport_h = viewport_h
-        self.base_hex_radius = 68.0
+        self.base_hex_radius = 64.0
         self.zoom = 1.0
         self.min_zoom = 0.50
         self.max_zoom = 2.60
-        self.pan_x = viewport_w * 0.5
+        self.pan_x = viewport_x + viewport_w * 0.5
         self.pan_y = viewport_h * 0.5
 
     @property
@@ -94,8 +114,18 @@ class HexCamera:
 
     def reset(self) -> None:
         self.zoom = 1.0
-        self.pan_x = self.viewport_w * 0.5
+        self.pan_x = self.viewport_x + self.viewport_w * 0.5
         self.pan_y = self.viewport_h * 0.5
+
+    def set_viewport(self, viewport_x: int, viewport_w: int) -> None:
+        """Update the horizontal viewport bounds and keep the arena centered in the viewport."""
+        if self.viewport_x == viewport_x and self.viewport_w == viewport_w:
+            return
+        old_center_x = self.viewport_x + self.viewport_w * 0.5
+        new_center_x = viewport_x + viewport_w * 0.5
+        self.viewport_x = viewport_x
+        self.viewport_w = viewport_w
+        self.pan_x += new_center_x - old_center_x
 
     def pan(self, dx: float, dy: float) -> None:
         self.pan_x += dx
