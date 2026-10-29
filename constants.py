@@ -122,6 +122,7 @@ DEFAULT_VULNERABLE_ARCS: FrozenSet[int] = frozenset({FLANK_LEFT, FLANK_RIGHT, RE
 JUNCTURE_BEFORE_ROTATE: str = "BEFORE_ROTATE"
 JUNCTURE_AFTER_ROTATE: str = "AFTER_ROTATE"
 JUNCTURE_AFTER_MOVE: str = "AFTER_MOVE"
+JUNCTURE_AFTER_POST_ROTATE: str = "AFTER_POST_ROTATE"
 
 # ============================================================================
 # Visual Theme & Color Palette

@@ -118,6 +118,9 @@ capabilities through five core attributes:
                             over occupied hexes during intermediate move steps
                             as long as they can land on an empty hex before
                             their turn ends.
+  - can_rotate_after_move : High-mobility Lizards (starting with the Stage 1
+                            Newt) can also rotate after completing their move
+                            (Move -> Rotate or Rotate -> Move -> Rotate).
 
 Optional Actions & Attack Junctures:
   - Within each Rotate-Move cycle, there are three junctures:
@@ -190,7 +193,10 @@ Turtle 8-Stage Lineup:
                                (2x8 slots) onto the green lower half of the
                                battlefield (one per hex), or drag back to
                                the Left Reserve Tray to undeploy.
-  - Enter Key (Setup)        : Confirm Deployment and begin the battle.
+  - Enter Key (Setup/Evol.)  : Confirm Deployment to begin the battle (Setup),
+                               or Confirm Evolution & Next Wave to return
+                               survivors to Reserve, add 4 Stage 1 reinforcements,
+                               and start the next round's Setup Phase.
   - Backspace / Delete       : Return selected deployed unit to Reserve (Setup).
   - Left-Click Unit          : Select any unit (in Left Reserve or on the map)
                                to inspect its portrait, stats, and legal moves.

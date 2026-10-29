@@ -80,9 +80,36 @@ def test_basic_stage1_creature_rotate_and_move() -> None:
     assert unit.hex_pos == (1, -1)
     assert unit.juncture == rules.JUNCTURE_AFTER_MOVE
 
-    # With num_rotate_moves=1, no further moves or rotations are allowed this turn
+    # With num_rotate_moves=1 and can_rotate_after_move=False, no further moves or rotations are allowed this turn
     assert rules.get_legal_moves(state, "u1") == []
     assert rules.get_legal_rotations(state, "u1") == []
+
+    # By contrast, Stage 1 Newt (Lizard) has can_rotate_after_move=True so it can move then rotate (and attack!)
+    newt_spec = rules.get_creature_spec(rules.CLASS_LIZARD, 1)
+    assert newt_spec.can_rotate_after_move is True
+    newt = rules.Unit(
+        unit_id="n1",
+        spec=newt_spec,
+        team=rules.TEAM_PLAYER,
+        hex_pos=(0, 1),
+        facing=rules.FACING_N,
+    )
+    state.units["n1"] = newt
+
+    # Newt moves 1 hex forward to (0, 0) first, then rotates CW to NE (1) and can still attack
+    assert rules.move_unit(state, "n1", (0, 0))
+    assert newt.hex_pos == (0, 0)
+    assert newt.juncture == rules.JUNCTURE_AFTER_MOVE
+    assert set(rules.get_legal_rotations(state, "n1")) == {
+        rules.FACING_NW,
+        rules.FACING_N,
+        rules.FACING_NE,
+    }
+    assert rules.rotate_unit(state, "n1", rules.FACING_NE)
+    assert newt.facing == rules.FACING_NE
+    assert newt.juncture == rules.JUNCTURE_AFTER_POST_ROTATE
+    assert rules.can_unit_attack_now(state, "n1")
+    assert rules.get_legal_moves(state, "n1") == []
 
 
 def test_tian_long_four_rotate_moves_and_omnidirectional_rotation() -> None:
@@ -138,8 +165,13 @@ def test_tian_long_four_rotate_moves_and_omnidirectional_rotation() -> None:
     assert rules.move_unit(state, "tian", (0, -1))
     assert unit.juncture == rules.JUNCTURE_AFTER_MOVE
 
-    # All 4 rotate-moves exhausted
+    # All 4 moves exhausted, and as a Lizard (can_rotate_after_move=True), Tian Long
+    # can still perform its post-move rotation (which locks once it attacks at AFTER_POST_ROTATE)
     assert rules.get_legal_moves(state, "tian") == []
+    assert set(rules.get_legal_rotations(state, "tian")) == {0, 1, 2, 3, 4, 5}
+    assert rules.rotate_unit(state, "tian", rules.FACING_N)
+    assert unit.juncture == rules.JUNCTURE_AFTER_POST_ROTATE
+    assert rules.record_juncture_attack(state, "tian")
     assert rules.get_legal_rotations(state, "tian") == []
 
 
@@ -433,11 +465,108 @@ def test_multi_arc_cleave_and_slaying_mammals_across_turns() -> None:
     assert rules.can_unit_attack_now(state, "adder")
 
     # Turn 2: Adder attacks Rat again for 4 dmg -> Rat is slain (HP 0, hex_pos None)
+    # and the game automatically enters PHASE_EVOLUTION with Adder leveled up to Stage 2 (Viper).
     res2 = rules.execute_attack(state, "adder", (0, 0))
     assert len(res2) == 1
     assert res2[0].defender_slain is True
     assert not rat.is_alive
     assert rat.hex_pos is None
     assert rules.are_all_enemies_slain(state)
+    assert state.phase == rules.PHASE_EVOLUTION
+    assert len(state.evolution_records) == 1
+    rec = state.evolution_records[0]
+    assert rec.unit_id == "adder"
+    assert rec.leveled_up is True
+    assert rec.old_spec.stage == 1
+    assert rec.new_spec.stage == 2
+    assert adder.spec.stage == 2
+
+
+def test_evolution_phase_pairs_vs_single_and_next_round_reinforcements() -> None:
+    """
+    Winning a battle enters PHASE_EVOLUTION:
+      - Round 1 survivors (0 -> 1 battle survived) all level up from Stage 1 -> Stage 2
+        (leveled_up=True, displayed in pairs with right arrow).
+      - Confirming evolution returns all survivors to the Left Reserve Tray at full HP,
+        grants REINFORCEMENTS_BASE (4) new Stage 1 reptiles, increments round_number to 2,
+        spawns the Round 2 Mammal wave, and enters PHASE_SETUP.
+      - After Round 2 battle: the 6 Round 1 veterans (1 -> 2 battles survived; Stage 3
+        needs 3 battles) have leveled_up=False (displayed alone without arrow), while the
+        4 Round 2 recruits (0 -> 1 battle survived) have leveled_up=True (Stage 1 -> Stage 2).
+    """
+    import random
+
+    rng = random.Random(2026)
+    state = rules.create_initial_game_state(game_mode=rules.GAME_MODE_BASIC, rng=rng)
+    deploy_hexes = rules.get_valid_player_deploy_hexes(state)
+
+    # Deploy all 6 initial Stage 1 reptiles and confirm deployment for Round 1
+    r1_units = state.get_player_army_units()
+    assert len(r1_units) == 6
+    for idx, pu in enumerate(r1_units):
+        assert rules.deploy_unit_to_hex(state, pu.unit_id, deploy_hexes[idx])
+    assert rules.confirm_deployment(state)
+    assert state.phase == rules.PHASE_BATTLE
+
+    # Damage one player unit slightly, slay all Round 1 enemies, and trigger PHASE_EVOLUTION
+    r1_units[0].hp -= 3
+    for eu in list(state.units.values()):
+        if eu.team == rules.TEAM_ENEMY:
+            eu.hp = 0
+            eu.hex_pos = None
+    assert rules.complete_battle_to_evolution(state)
+    assert state.phase == rules.PHASE_EVOLUTION
+    assert len(state.evolution_records) == 6
+
+    # All 6 Round 1 survivors went from 0 -> 1 battle survived, so all 6 leveled up (Stage 1 -> Stage 2)
+    for rec in state.evolution_records:
+        assert rec.battles_survived == 1
+        assert rec.leveled_up is True
+        assert rec.old_spec.stage == 1
+        assert rec.new_spec.stage == 2
+
+    # Confirm evolution -> transitions to Round 2 PHASE_SETUP with 6 + 4 = 10 reptiles in Reserve
+    assert rules.confirm_evolution_phase(state, rng=rng)
+    assert state.phase == rules.PHASE_SETUP
+    assert state.round_number == 2
+    assert len(state.evolution_records) == 0
+
+    r2_units = state.get_player_army_units()
+    assert len(r2_units) == 10
+    for pu in r2_units:
+        assert pu.in_reserve
+        assert not pu.is_deployed
+        assert pu.hp == pu.max_hp
+
+    # Deploy all 10 reptiles and win Round 2
+    for idx, pu in enumerate(r2_units):
+        assert rules.deploy_unit_to_hex(state, pu.unit_id, deploy_hexes[idx])
+    assert rules.confirm_deployment(state)
+    assert state.phase == rules.PHASE_BATTLE
+
+    for eu in list(state.units.values()):
+        if eu.team == rules.TEAM_ENEMY:
+            eu.hp = 0
+            eu.hex_pos = None
+    assert rules.complete_battle_to_evolution(state)
+    assert state.phase == rules.PHASE_EVOLUTION
+    assert len(state.evolution_records) == 10
+
+    # First 6 veterans have battles_survived == 2 -> NOT leveled up (Stage 2 stays Stage 2, shown alone)
+    veteran_recs = [r for r in state.evolution_records if r.battles_survived == 2]
+    recruit_recs = [r for r in state.evolution_records if r.battles_survived == 1]
+    assert len(veteran_recs) == 6
+    assert len(recruit_recs) == 4
+
+    for vrec in veteran_recs:
+        assert vrec.leveled_up is False
+        assert vrec.old_spec.stage == 2
+        assert vrec.new_spec.stage == 2
+
+    for rrec in recruit_recs:
+        assert rrec.leveled_up is True
+        assert rrec.old_spec.stage == 1
+        assert rrec.new_spec.stage == 2
+
 
 

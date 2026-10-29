@@ -65,7 +65,13 @@ class DenizensApp:
                 f"{res.attacker_name} hit {res.defender_name} for {res.damage} dmg{vuln_str}{slain_str}"
             )
         summary = "  |  ".join(parts)
-        if rules.are_all_enemies_slain(self.state):
+        if self.state.phase == C.PHASE_EVOLUTION:
+            leveled_cnt = sum(1 for r in self.state.evolution_records if r.leveled_up)
+            summary += (
+                f"   *** VICTORY! Entering Evolution Phase ({len(self.state.evolution_records)} survivors, "
+                f"{leveled_cnt} evolved) — Press Enter or click Confirm Evolution! ***"
+            )
+        elif rules.are_all_enemies_slain(self.state):
             summary += "   *** VICTORY! All Enemy Mammals Slain! ***"
         self.status_message = summary
 
@@ -133,17 +139,43 @@ class DenizensApp:
 
         elif action_id == "end_turn":
             if rules.end_turn(self.state):
-                enemies_left = sum(
+                if self.state.phase == C.PHASE_EVOLUTION:
+                    leveled_cnt = sum(
+                        1 for r in self.state.evolution_records if r.leveled_up
+                    )
+                    self.status_message = (
+                        f"Battle Won! Evolution Phase: {len(self.state.evolution_records)} survivors "
+                        f"({leveled_cnt} evolved). Press Enter or click Confirm Evolution."
+                    )
+                else:
+                    enemies_left = sum(
+                        1
+                        for u in self.state.units.values()
+                        if u.is_alive and u.team == C.TEAM_ENEMY
+                    )
+                    self.status_message = (
+                        f"Combat Turn {self.state.turn_number} — All player units refreshed! "
+                        f"({enemies_left} enemy mammals remaining)"
+                    )
+            else:
+                self.status_message = "Cannot end turn while a flying creature is overlapping another unit!"
+
+        elif action_id == "confirm_evolution":
+            if rules.confirm_evolution_phase(self.state):
+                self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
+                army_cnt = len(self.state.get_player_army_units())
+                enemy_cnt = sum(
                     1
                     for u in self.state.units.values()
                     if u.is_alive and u.team == C.TEAM_ENEMY
                 )
                 self.status_message = (
-                    f"Combat Turn {self.state.turn_number} — All player units refreshed! "
-                    f"({enemies_left} enemy mammals remaining)"
+                    f"Round {self.state.round_number} Setup: {army_cnt} reptiles in Reserve "
+                    f"(+{C.REINFORCEMENTS_BASE} reinforcements, max {C.MAX_ARMY_SIZE}) vs "
+                    f"{enemy_cnt} Enemy Mammals ({self.state.wave_budget} pts). Drag all reptiles onto the lower half!"
                 )
             else:
-                self.status_message = "Cannot end turn while a flying creature is overlapping another unit!"
+                self.status_message = "Confirm Evolution is only available during the Evolution Phase."
 
         elif action_id == "reset_camera":
             self.camera.reset()
@@ -301,6 +333,8 @@ class DenizensApp:
                 elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                     if self.state.phase == C.PHASE_SETUP:
                         self.handle_action("confirm_deployment")
+                    elif self.state.phase == C.PHASE_EVOLUTION:
+                        self.handle_action("confirm_evolution")
                 elif event.key in (pygame.K_BACKSPACE, pygame.K_DELETE):
                     if self.state.phase == C.PHASE_SETUP:
                         self.handle_action("undeploy_unit")
@@ -341,15 +375,29 @@ class DenizensApp:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mx, my = event.pos
                 if event.button == 1:
-                    if self.state.phase == C.PHASE_SETUP and mx < C.MAP_VIEWPORT_X:
-                        self.handle_reserve_left_down((mx, my))
-                    elif mx >= C.SIDEBAR_X:
-                        for btn in self.renderer.buttons:
-                            if btn.enabled and btn.rect.collidepoint(mx, my):
-                                self.handle_action(btn.action_id)
-                                break
-                    else:
-                        self.handle_map_left_down((mx, my))
+                    clicked_button = False
+                    for btn in self.renderer.buttons:
+                        if btn.enabled and btn.rect.collidepoint(mx, my):
+                            self.handle_action(btn.action_id)
+                            clicked_button = True
+                            break
+                    if not clicked_button:
+                        if self.state.phase == C.PHASE_EVOLUTION and mx < C.SIDEBAR_X:
+                            uid = self.renderer.get_evolution_unit_at_pos(
+                                self.state, (mx, my)
+                            )
+                            if uid is not None:
+                                self.state.selected_unit_id = uid
+                                u = self.state.get_unit(uid)
+                                if u:
+                                    self.status_message = (
+                                        f"Inspecting survivor {u.spec.name} "
+                                        f"(Stage {u.spec.stage}, {u.battles_survived} battles survived)."
+                                    )
+                        elif self.state.phase == C.PHASE_SETUP and mx < C.MAP_VIEWPORT_X:
+                            self.handle_reserve_left_down((mx, my))
+                        elif mx < C.SIDEBAR_X:
+                            self.handle_map_left_down((mx, my))
                 elif (
                     event.button == 3
                     and self._in_map_viewport(mx)

@@ -61,6 +61,9 @@ class CreatureSpec:
         (taken at BEFORE_ROTATE, AFTER_ROTATE, or AFTER_MOVE junctures, max 1 per juncture).
       - can_fly: Whether the creature can fly over occupied hexes during intermediate
         move steps as long as it can land on an empty hex before ending its turn.
+      - can_rotate_after_move: Whether the creature can perform a post-move rotation
+        (up to `max_rotate_per_move`) after completing its move (e.g. Newt and the
+        high-mobility Lizard lineage can Move -> Rotate or Rotate -> Move -> Rotate).
       - point_cost: Strength point value used by the computer opponent's wave-buying
         algorithm and adaptive wave scaling.
     """
@@ -75,6 +78,7 @@ class CreatureSpec:
     legal_move_dirs: FrozenSet[int] = DIRS_FORWARD_ONLY
     total_attacks_per_move: int = 1
     can_fly: bool = False
+    can_rotate_after_move: bool = False
     max_hp: int = 10
     attack: int = 4
     defense: int = 2
@@ -246,6 +250,7 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         legal_move_dirs=DIRS_FORWARD_ONLY,
         total_attacks_per_move=1,
         can_fly=False,
+        can_rotate_after_move=True,
         max_hp=9,
         attack=3,
         defense=2,
@@ -262,6 +267,7 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
         total_attacks_per_move=1,
         can_fly=False,
+        can_rotate_after_move=True,
         max_hp=11,
         attack=4,
         defense=3,
@@ -279,6 +285,7 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
         total_attacks_per_move=1,
         can_fly=False,
+        can_rotate_after_move=True,
         max_hp=14,
         attack=6,
         defense=3,
@@ -296,6 +303,7 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         legal_move_dirs=DIRS_ALL_SIX,
         total_attacks_per_move=2,
         can_fly=False,
+        can_rotate_after_move=True,
         max_hp=17,
         attack=8,
         defense=4,
@@ -313,6 +321,7 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
         total_attacks_per_move=2,
         can_fly=True,
+        can_rotate_after_move=True,
         max_hp=20,
         attack=9,
         defense=4,
@@ -330,6 +339,7 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
         total_attacks_per_move=2,
         can_fly=True,
+        can_rotate_after_move=True,
         max_hp=24,
         attack=11,
         defense=5,
@@ -347,6 +357,7 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
         total_attacks_per_move=2,
         can_fly=True,
+        can_rotate_after_move=True,
         max_hp=28,
         attack=13,
         defense=6,
@@ -365,6 +376,7 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         legal_move_dirs=DIRS_FRONT_ARC_AND_REAR,
         total_attacks_per_move=3,
         can_fly=True,
+        can_rotate_after_move=True,
         max_hp=33,
         attack=15,
         defense=7,

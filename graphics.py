@@ -187,6 +187,38 @@ class BattleRenderer:
                 return slot_idx
         return None
 
+    def get_evolution_slot_rect(self, slot_idx: int) -> pygame.Rect:
+        """
+        Return the screen rectangle for survivor `slot_idx` (0 .. MAX_ARMY_SIZE - 1)
+        arranged in 2 columns of up to 8 rows inside the Evolution Phase viewport.
+        """
+        col = slot_idx // C.RESERVE_ROWS
+        row = slot_idx % C.RESERVE_ROWS
+        pad_x = 24
+        gap_x = 24
+        cell_w = (C.SIDEBAR_X - 2 * pad_x - gap_x) // C.RESERVE_COLS  # 754px
+        top_y = 94
+        gap_y = 9
+        cell_h = 116
+        x = pad_x + col * (cell_w + gap_x)
+        y = top_y + row * (cell_h + gap_y)
+        return pygame.Rect(x, y, cell_w, cell_h)
+
+    def get_evolution_unit_at_pos(
+        self, state: rules.GameState, screen_pos: Tuple[int, int]
+    ) -> Optional[str]:
+        """Return the `unit_id` of the survivor clicked in `PHASE_EVOLUTION`, or None."""
+        mx, my = screen_pos
+        if mx < 0 or mx >= C.SIDEBAR_X:
+            return None
+        for idx, rec in enumerate(state.evolution_records):
+            rect = self.get_evolution_slot_rect(idx)
+            hit_w = rect.width if rec.leveled_up else 328
+            hit_rect = pygame.Rect(rect.x, rect.y, hit_w, rect.height)
+            if hit_rect.collidepoint(mx, my):
+                return rec.unit_id
+        return None
+
     # ------------------------------------------------------------------------
     # Master Frame Render
     # ------------------------------------------------------------------------
@@ -202,6 +234,8 @@ class BattleRenderer:
         is_dragging: bool = False,
         mouse_pos: Tuple[int, int] = (0, 0),
     ) -> None:
+        self.buttons.clear()
+
         if state.phase == C.PHASE_SETUP:
             self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
             self.draw_reserve_panel(
@@ -209,17 +243,27 @@ class BattleRenderer:
                 hovered_reserve_slot=hovered_reserve_slot,
                 dragging_unit_id=dragging_unit_id if is_dragging else None,
             )
+            self.draw_map_viewport(
+                state,
+                arena_hexes,
+                hovered_hex,
+                status_message,
+                dragging_unit_id=dragging_unit_id if is_dragging else None,
+            )
+        elif state.phase == C.PHASE_EVOLUTION:
+            self.camera.set_viewport(0, C.SIDEBAR_X)
+            self.draw_evolution_phase(state, status_message)
         else:
             # Left Reserve Panel goes away once deployment is confirmed (PHASE_BATTLE)
             self.camera.set_viewport(0, C.SIDEBAR_X)
+            self.draw_map_viewport(
+                state,
+                arena_hexes,
+                hovered_hex,
+                status_message,
+                dragging_unit_id=None,
+            )
 
-        self.draw_map_viewport(
-            state,
-            arena_hexes,
-            hovered_hex,
-            status_message,
-            dragging_unit_id=dragging_unit_id if is_dragging else None,
-        )
         self.draw_sidebar(state, hovered_hex)
 
         if is_dragging and dragging_unit_id is not None:
@@ -695,6 +739,213 @@ class BattleRenderer:
         status_surf = self.font_body.render(status_message, True, C.COLOR_TEXT_GOLD)
         self.screen.blit(status_surf, (hud_x + 14, C.SCREEN_HEIGHT - 38))
 
+    def _draw_evolution_creature_box(
+        self,
+        rect: pygame.Rect,
+        spec: creatures.CreatureSpec,
+        line4_text: str,
+        line4_col: Tuple[int, int, int],
+        is_upgraded: bool,
+        is_selected: bool,
+    ) -> None:
+        """Render a single creature card (either Original or Upgraded) inside the Evolution Phase."""
+        if is_upgraded:
+            bg_col = (26, 42, 36)
+            border_col = C.COLOR_TEXT_GOLD if is_selected else C.COLOR_TEXT_GREEN
+            ring_col = C.COLOR_TEXT_GOLD
+        else:
+            bg_col = (30, 35, 44)
+            border_col = C.COLOR_TEXT_GOLD if is_selected else (82, 92, 108)
+            ring_col = C.COLOR_PLAYER_RING
+
+        border_w = 3 if is_selected else 2
+        pygame.draw.rect(self.screen, bg_col, rect, border_radius=8)
+        pygame.draw.rect(self.screen, border_col, rect, width=border_w, border_radius=8)
+
+        # Sprite on the left side of the box
+        sprite_px = 76
+        sx = rect.x + 48
+        sy = rect.centery
+        pygame.draw.circle(self.screen, ring_col, (sx, sy), 34, width=2)
+        sprite = self.assets.get_topdown_sprite(
+            spec.topdown_path, C.FACING_N, sprite_px
+        )
+        self.screen.blit(
+            sprite,
+            (sx - sprite.get_width() * 0.5, sy - sprite.get_height() * 0.5),
+        )
+
+        # Text lines on the right side of the box
+        tx = rect.x + 94
+        ty = rect.y + 10
+        name_col = C.COLOR_TEXT_GOLD if is_upgraded else C.COLOR_TEXT_MAIN
+        name_surf = self.font_subtitle.render(spec.name, True, name_col)
+        self.screen.blit(name_surf, (tx, ty))
+        ty += 24
+
+        stg_str = (
+            f"Stage {spec.stage}/8 {spec.creature_class.title()} • {spec.point_cost} pt"
+            + ("s" if spec.point_cost != 1 else "")
+        )
+        stg_surf = self.font_small.render(
+            stg_str,
+            True,
+            C.COLOR_TEXT_GREEN if is_upgraded else C.COLOR_TEXT_GOLD,
+        )
+        self.screen.blit(stg_surf, (tx, ty))
+        ty += 22
+
+        stats_str = f"HP {spec.max_hp}  •  ATK {spec.attack}  •  DEF {spec.defense}"
+        stats_surf = self.font_small.render(stats_str, True, C.COLOR_TEXT_MAIN)
+        self.screen.blit(stats_surf, (tx, ty))
+        ty += 22
+
+        l4_surf = self.font_tiny.render(line4_text, True, line4_col)
+        self.screen.blit(l4_surf, (tx, ty))
+
+    def draw_evolution_phase(
+        self, state: rules.GameState, status_message: str
+    ) -> None:
+        """
+        Render the post-battle Evolution Phase (`PHASE_EVOLUTION`):
+          - Leveled-up survivors are displayed in pairs:
+            [Original Survivor]  ───►  [Upgraded Survivor]
+          - Survivors that did not level up are displayed by themselves with no right arrow
+            and no second form.
+        """
+        viewport_rect = pygame.Rect(0, 0, C.SIDEBAR_X, C.SCREEN_HEIGHT)
+        self.screen.set_clip(viewport_rect)
+        self.screen.fill(C.COLOR_BG_VOID, viewport_rect)
+
+        # Top Header Bar
+        hud_x = 24
+        hud_w = C.SIDEBAR_X - 48
+        hud_rect = pygame.Rect(hud_x, 14, hud_w, 68)
+        pygame.draw.rect(self.screen, (20, 24, 30), hud_rect, border_radius=8)
+        pygame.draw.rect(
+            self.screen, C.COLOR_PANEL_BORDER, hud_rect, width=2, border_radius=8
+        )
+
+        leveled_cnt = sum(1 for r in state.evolution_records if r.leveled_up)
+        header_txt = (
+            f"ROUND {state.round_number} COMPLETE — SURVIVOR EVOLUTION PHASE   •   "
+            f"SURVIVORS: {len(state.evolution_records)}   •   "
+            f"LEVELED UP: {leveled_cnt}"
+        )
+        header = self.font_subtitle.render(header_txt, True, C.COLOR_TEXT_GOLD)
+        self.screen.blit(header, (hud_x + 16, 22))
+
+        sub_txt = (
+            f"Click any survivor to inspect. Press Enter or click Confirm Evolution to receive "
+            f"+{state.reinforcements_per_round} Stage 1 Reinforcements & begin Round {state.round_number + 1} Deployment!"
+        )
+        sub_surf = self.font_small.render(sub_txt, True, C.COLOR_TEXT_MUTED)
+        self.screen.blit(sub_surf, (hud_x + 16, 50))
+
+        # Confirm button inside the top-right of the Evolution header bar
+        hdr_btn_rect = pygame.Rect(hud_rect.right - 270, hud_rect.y + 14, 254, 40)
+        self.buttons.append(
+            UIButton(
+                hdr_btn_rect,
+                "Confirm Evolution [Enter]",
+                "confirm_evolution",
+                enabled=True,
+                accent_color=(60, 155, 95),
+            )
+        )
+
+        # Draw each surviving player reptile
+        box_w = 328
+        for idx, rec in enumerate(state.evolution_records):
+            if idx >= C.MAX_ARMY_SIZE:
+                break
+            cell_rect = self.get_evolution_slot_rect(idx)
+            is_sel = rec.unit_id == state.selected_unit_id
+
+            left_rect = pygame.Rect(cell_rect.x, cell_rect.y, box_w, cell_rect.height)
+            if rec.leveled_up:
+                l4_orig = f"Battles Survived: {rec.battles_survived} (LEVEL UP!)"
+                l4_orig_col = C.COLOR_TEXT_GOLD
+            elif rec.old_spec.stage < 8:
+                next_req = creatures.evolution_battles_required(rec.old_spec.stage + 1)
+                l4_orig = (
+                    f"Battles Survived: {rec.battles_survived}/{next_req} "
+                    f"(Next Stage at {next_req})"
+                )
+                l4_orig_col = C.COLOR_TEXT_MUTED
+            else:
+                l4_orig = f"Battles Survived: {rec.battles_survived} (MAX STAGE 8)"
+                l4_orig_col = C.COLOR_TEXT_GOLD
+
+            # 1. Left Box: Original Survivor
+            self._draw_evolution_creature_box(
+                left_rect,
+                rec.old_spec,
+                l4_orig,
+                l4_orig_col,
+                is_upgraded=False,
+                is_selected=is_sel and not rec.leveled_up,
+            )
+
+            # 2. If leveled up: draw Right-Pointing Arrow + Upgraded Survivor Box on the right
+            if rec.leveled_up:
+                arrow_x1 = left_rect.right + 12
+                arrow_x2 = left_rect.right + 70
+                arrow_y = cell_rect.centery + 6
+
+                evo_tag = self.font_tiny.render("EVOLVED", True, C.COLOR_TEXT_GOLD)
+                self.screen.blit(
+                    evo_tag,
+                    (
+                        (arrow_x1 + arrow_x2 + 14) * 0.5 - evo_tag.get_width() * 0.5,
+                        arrow_y - 24,
+                    ),
+                )
+
+                pygame.draw.line(
+                    self.screen,
+                    C.COLOR_TEXT_GOLD,
+                    (arrow_x1, arrow_y),
+                    (arrow_x2, arrow_y),
+                    width=6,
+                )
+                pygame.draw.polygon(
+                    self.screen,
+                    C.COLOR_TEXT_GOLD,
+                    [
+                        (arrow_x2, arrow_y - 11),
+                        (arrow_x2 + 16, arrow_y),
+                        (arrow_x2, arrow_y + 11),
+                    ],
+                )
+
+                right_rect = pygame.Rect(
+                    left_rect.right + 98, cell_rect.y, box_w, cell_rect.height
+                )
+                l4_new = (
+                    f"Moves: {rec.new_spec.num_rotate_moves}  •  "
+                    f"Rot: {rec.new_spec.max_rotate_per_move}  •  "
+                    f"Atks: {rec.new_spec.total_attacks_per_move}"
+                )
+                self._draw_evolution_creature_box(
+                    right_rect,
+                    rec.new_spec,
+                    l4_new,
+                    C.COLOR_TEXT_CYAN,
+                    is_upgraded=True,
+                    is_selected=is_sel,
+                )
+
+        # Bottom Status Bar
+        status_rect = pygame.Rect(hud_x, C.SCREEN_HEIGHT - 46, hud_w, 34)
+        pygame.draw.rect(self.screen, (20, 24, 30), status_rect, border_radius=6)
+        pygame.draw.rect(
+            self.screen, (60, 70, 84), status_rect, width=1, border_radius=6
+        )
+        status_surf = self.font_body.render(status_message, True, C.COLOR_TEXT_GOLD)
+        self.screen.blit(status_surf, (hud_x + 14, C.SCREEN_HEIGHT - 38))
+        self.screen.set_clip(None)
+
     def draw_dragged_unit_ghost(
         self,
         state: rules.GameState,
@@ -888,8 +1139,8 @@ class BattleRenderer:
                 C.COLOR_TEXT_MAIN,
             ),
             (
-                f"Attack & Flight: total_attacks_per_move={spec.total_attacks_per_move}   •   can_fly={'YES' if spec.can_fly else 'NO'}",
-                C.COLOR_TEXT_CYAN if spec.can_fly else C.COLOR_TEXT_MAIN,
+                f"Attack & Flight: total_attacks={spec.total_attacks_per_move}   •   can_fly={'YES' if spec.can_fly else 'NO'}   •   post_rotate={'YES' if spec.can_rotate_after_move else 'NO'}",
+                C.COLOR_TEXT_CYAN if (spec.can_fly or spec.can_rotate_after_move) else C.COLOR_TEXT_MAIN,
             ),
             (f"Legal Move Dirs: {move_dir_names}", C.COLOR_TEXT_GREEN),
             (f"Attack Arcs:     {atk_arc_names}", C.COLOR_TEXT_MAIN),
@@ -903,74 +1154,85 @@ class BattleRenderer:
             cy_line += 26
         y += 208
 
-        # 5. Interactive Action & Setup/Battle Buttons
-        self.buttons.clear()
+        # 5. Interactive Action & Setup/Battle/Evolution Buttons
         btn_w = (card_w - 12) // 2
         btn_h = 40
 
-        can_rot_ccw = ((unit.facing - 1) % 6) in legal_rots
-        can_rot_cw = ((unit.facing + 1) % 6) in legal_rots
-
-        row1_y = y
-        self.buttons.append(
-            UIButton(
-                pygame.Rect(x0, row1_y, btn_w, btn_h),
-                "Rotate CCW [Left / Q]",
-                "rotate_ccw",
-                enabled=can_rot_ccw,
-                accent_color=(65, 115, 155),
-            )
-        )
-        self.buttons.append(
-            UIButton(
-                pygame.Rect(x0 + btn_w + 12, row1_y, btn_w, btn_h),
-                "Rotate CW [Right / E]",
-                "rotate_cw",
-                enabled=can_rot_cw,
-                accent_color=(65, 115, 155),
-            )
-        )
-
-        row2_y = row1_y + btn_h + 10
-        if state.phase == C.PHASE_SETUP:
-            can_undeploy = unit.team == C.TEAM_PLAYER and unit.is_deployed
+        if state.phase == C.PHASE_EVOLUTION:
+            row1_y = y
             self.buttons.append(
                 UIButton(
-                    pygame.Rect(x0, row2_y, btn_w, btn_h),
-                    "Return to Reserve [Bksp]",
-                    "undeploy_unit",
-                    enabled=can_undeploy,
-                    accent_color=(135, 85, 65),
-                )
-            )
-            self.buttons.append(
-                UIButton(
-                    pygame.Rect(x0 + btn_w + 12, row2_y, btn_w, btn_h),
-                    "Confirm Deployment [Enter]",
-                    "confirm_deployment",
-                    enabled=rules.can_confirm_deployment(state),
+                    pygame.Rect(x0, row1_y, card_w, btn_h + 6),
+                    "Confirm Evolution & Next Wave [Enter]",
+                    "confirm_evolution",
+                    enabled=True,
                     accent_color=(60, 155, 95),
                 )
             )
         else:
+            can_rot_ccw = ((unit.facing - 1) % 6) in legal_rots
+            can_rot_cw = ((unit.facing + 1) % 6) in legal_rots
+
+            row1_y = y
             self.buttons.append(
                 UIButton(
-                    pygame.Rect(x0, row2_y, btn_w, btn_h),
-                    f"Attack ({unit.juncture[:10]}) [F]",
-                    "juncture_attack",
-                    enabled=can_exec_atk,
-                    accent_color=(165, 70, 65),
+                    pygame.Rect(x0, row1_y, btn_w, btn_h),
+                    "Rotate CCW [Left / Q]",
+                    "rotate_ccw",
+                    enabled=can_rot_ccw,
+                    accent_color=(65, 115, 155),
                 )
             )
             self.buttons.append(
                 UIButton(
-                    pygame.Rect(x0 + btn_w + 12, row2_y, btn_w, btn_h),
-                    "End Turn [Space]",
-                    "end_turn",
-                    enabled=rules.can_end_turn(state),
-                    accent_color=(70, 140, 90),
+                    pygame.Rect(x0 + btn_w + 12, row1_y, btn_w, btn_h),
+                    "Rotate CW [Right / E]",
+                    "rotate_cw",
+                    enabled=can_rot_cw,
+                    accent_color=(65, 115, 155),
                 )
             )
+
+            row2_y = row1_y + btn_h + 10
+            if state.phase == C.PHASE_SETUP:
+                can_undeploy = unit.team == C.TEAM_PLAYER and unit.is_deployed
+                self.buttons.append(
+                    UIButton(
+                        pygame.Rect(x0, row2_y, btn_w, btn_h),
+                        "Return to Reserve [Bksp]",
+                        "undeploy_unit",
+                        enabled=can_undeploy,
+                        accent_color=(135, 85, 65),
+                    )
+                )
+                self.buttons.append(
+                    UIButton(
+                        pygame.Rect(x0 + btn_w + 12, row2_y, btn_w, btn_h),
+                        "Confirm Deployment [Enter]",
+                        "confirm_deployment",
+                        enabled=rules.can_confirm_deployment(state),
+                        accent_color=(60, 155, 95),
+                    )
+                )
+            else:
+                self.buttons.append(
+                    UIButton(
+                        pygame.Rect(x0, row2_y, btn_w, btn_h),
+                        f"Attack ({unit.juncture[:10]}) [F]",
+                        "juncture_attack",
+                        enabled=can_exec_atk,
+                        accent_color=(165, 70, 65),
+                    )
+                )
+                self.buttons.append(
+                    UIButton(
+                        pygame.Rect(x0 + btn_w + 12, row2_y, btn_w, btn_h),
+                        "End Turn [Space]",
+                        "end_turn",
+                        enabled=rules.can_end_turn(state),
+                        accent_color=(70, 140, 90),
+                    )
+                )
 
         mx, my = pygame.mouse.get_pos()
         for btn in self.buttons:

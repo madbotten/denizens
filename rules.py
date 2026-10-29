@@ -40,6 +40,7 @@ from constants import (
     GAME_MODE_BASIC,
     INITIAL_ARMY_SIZE,
     JUNCTURE_AFTER_MOVE,
+    JUNCTURE_AFTER_POST_ROTATE,
     JUNCTURE_AFTER_ROTATE,
     JUNCTURE_BEFORE_ROTATE,
     MAX_ARMY_SIZE,
@@ -121,6 +122,10 @@ class Unit:
         return self.hp > 0
 
     @property
+    def max_hp(self) -> int:
+        return self.spec.max_hp
+
+    @property
     def is_deployed(self) -> bool:
         return self.is_alive and self.hex_pos is not None
 
@@ -131,7 +136,7 @@ class Unit:
     @property
     def moves_completed(self) -> int:
         """Return how many moves this unit has taken or finalized so far this turn."""
-        if self.juncture == JUNCTURE_AFTER_MOVE:
+        if self.juncture in (JUNCTURE_AFTER_MOVE, JUNCTURE_AFTER_POST_ROTATE):
             return self.current_step + 1
         return self.current_step
 
@@ -371,6 +376,7 @@ def complete_battle_to_evolution(state: GameState) -> bool:
         leveled_up = new_spec.stage > old_spec.stage
         u.spec = new_spec
         u.hp = new_spec.max_hp
+        u.poison_stacks = 0
         u.reset_for_turn()
         records.append(
             EvolutionRecord(
@@ -407,6 +413,7 @@ def confirm_evolution_phase(
         u.hex_pos = None
         u.facing = FACING_N
         u.hp = u.spec.max_hp
+        u.poison_stacks = 0
         u.reserve_slot = idx
         u.reset_for_turn()
 
@@ -700,11 +707,12 @@ def can_reach_empty_landing_hex(
 
 def _rotation_step_context(
     state: GameState, unit: Unit
-) -> Optional[Tuple[int, int, bool]]:
+) -> Optional[Tuple[int, int, bool, bool]]:
     """
     Determine which Rotate-Move step a rotation by `unit` would apply to.
 
-    Returns `(target_step, ref_facing, advances_to_next_step)` or `None` if rotating is illegal.
+    Returns `(target_step, ref_facing, advances_to_next_step, is_post_move_rotate)`
+    or `None` if rotating is illegal.
     """
     spec = unit.spec
     if spec.max_rotate_per_move <= 0 or spec.num_rotate_moves <= 0:
@@ -714,12 +722,21 @@ def _rotation_step_context(
         unit.juncture == JUNCTURE_AFTER_ROTATE and not unit.attacked_at_current_juncture
     ):
         if unit.current_step < spec.num_rotate_moves:
-            return (unit.current_step, unit.step_start_facing, False)
+            return (unit.current_step, unit.step_start_facing, False, False)
         return None
 
     next_step = unit.current_step + 1
     if next_step < spec.num_rotate_moves:
-        return (next_step, unit.facing, True)
+        return (next_step, unit.facing, True, False)
+
+    if spec.can_rotate_after_move:
+        if unit.juncture == JUNCTURE_AFTER_MOVE:
+            return (unit.current_step, unit.facing, False, True)
+        if (
+            unit.juncture == JUNCTURE_AFTER_POST_ROTATE
+            and not unit.attacked_at_current_juncture
+        ):
+            return (unit.current_step, unit.step_start_facing, False, True)
 
     return None
 
@@ -745,7 +762,7 @@ def get_legal_rotations(state: GameState, unit_id: str) -> List[int]:
     if ctx is None:
         return []
 
-    target_step, ref_facing, _ = ctx
+    target_step, ref_facing, _, _ = ctx
     spec = unit.spec
     overlapping = is_unit_overlapping(state, unit_id)
     steps_remaining_from_target = spec.num_rotate_moves - target_step
@@ -809,10 +826,22 @@ def rotate_unit(state: GameState, unit_id: str, new_facing: int) -> bool:
     if ctx is None:
         return False
 
-    target_step, ref_facing, advances_to_next_step = ctx
+    target_step, ref_facing, advances_to_next_step, is_post_move_rotate = ctx
     if advances_to_next_step:
         unit.current_step = target_step
         unit.step_start_facing = ref_facing
+
+    if is_post_move_rotate:
+        if unit.juncture == JUNCTURE_AFTER_MOVE:
+            unit.step_start_facing = ref_facing
+        unit.facing = new_facing
+        if unit.facing == unit.step_start_facing and not unit.attacked_at_current_juncture:
+            unit.juncture = JUNCTURE_AFTER_MOVE
+        else:
+            if unit.juncture != JUNCTURE_AFTER_POST_ROTATE:
+                unit.juncture = JUNCTURE_AFTER_POST_ROTATE
+                unit.attacked_at_current_juncture = False
+        return True
 
     unit.facing = new_facing
     if unit.facing == unit.step_start_facing and not unit.attacked_at_current_juncture:
@@ -902,10 +931,8 @@ def move_unit(state: GameState, unit_id: str, target_hex: HexCoord) -> bool:
     if target_step is None:
         return False
 
-    if target_step != unit.current_step:
-        unit.current_step = target_step
-        unit.step_start_facing = unit.facing
-
+    unit.current_step = target_step
+    unit.step_start_facing = unit.facing
     unit.hex_pos = target_hex
     unit.juncture = JUNCTURE_AFTER_MOVE
     unit.attacked_at_current_juncture = False
@@ -1152,6 +1179,8 @@ def execute_attack(
         )
 
     state.last_attack_results = results
+    if are_all_enemies_slain(state):
+        complete_battle_to_evolution(state)
     return results
 
 
@@ -1202,6 +1231,9 @@ def end_turn(state: GameState) -> bool:
                     unit.hex_pos = None
                     continue
         unit.reset_for_turn()
+
+    if are_all_enemies_slain(state):
+        complete_battle_to_evolution(state)
 
     return True
 
