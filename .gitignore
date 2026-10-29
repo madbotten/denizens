@@ -24,3 +24,7 @@ dist/
 
 # Compiled native tool binaries (keep .m/.c sources tracked)
 tools/make_transparent
+
+# Diagnostic battle replay logs generated during headless evolution runs
+battle_logs/
+

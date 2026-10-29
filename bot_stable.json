@@ -1,0 +1,2022 @@
+{
+  "max_size": 12,
+  "total_generations_run": 12,
+  "bots": [
+    {
+      "bot_id": "g12_mut_69",
+      "name": "StormRavager-M12P4",
+      "generation": 12,
+      "fitness": 754.0,
+      "elo_rating": 1810.1,
+      "wins_vs_classic": 4,
+      "games_vs_classic": 4,
+      "championship_streak": 1,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 2.331,
+          "mammal_02_wolf": 1.196,
+          "mammal_03_bear": 1.883,
+          "mammal_04_lion": 1.154,
+          "mammal_05_griffon": 2.532,
+          "mammal_06_owlbear": 0.682,
+          "mammal_07_behemoth": 0.15,
+          "mammal_08_displacer_beast": 1.914,
+          "mammal_09_manticore": 0.426,
+          "mammal_10_rajang": 0.722,
+          "mammal_11_dire_wolf": 2.078,
+          "mammal_12_sabertooth": 1.971,
+          "mammal_13_hell_hound": 1.588
+        },
+        "elite_vs_swarm_bias": 0.039,
+        "frontline_aggression": 0.417,
+        "tank_frontline_weight": 0.9,
+        "spread_vs_cluster": -0.282,
+        "wing_inward_facing_bias": 0.725
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 28.594,
+          "flanking_weight": 14.0,
+          "self_defense_weight": 33.061,
+          "pack_cohesion_weight": 28.89,
+          "cleave_positioning_weight": 44.263,
+          "hit_and_run_weight": 22.407,
+          "fly_over_readiness": 39.599
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 43.381,
+          "flanking_weight": 42.511,
+          "self_defense_weight": 28.248,
+          "pack_cohesion_weight": 16.814,
+          "cleave_positioning_weight": 18.582,
+          "hit_and_run_weight": 18.084,
+          "fly_over_readiness": 7.19
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 27.844,
+          "flanking_weight": 20.15,
+          "self_defense_weight": 42.254,
+          "pack_cohesion_weight": 9.026,
+          "cleave_positioning_weight": 35.105,
+          "hit_and_run_weight": 22.564,
+          "fly_over_readiness": 21.529
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 42.088,
+          "flanking_weight": 30.781,
+          "self_defense_weight": 25.975,
+          "pack_cohesion_weight": 21.449,
+          "cleave_positioning_weight": 29.07,
+          "hit_and_run_weight": 14.677,
+          "fly_over_readiness": 11.143
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 42.093,
+          "flanking_weight": 32.798,
+          "self_defense_weight": 27.668,
+          "pack_cohesion_weight": 3.531,
+          "cleave_positioning_weight": 26.064,
+          "hit_and_run_weight": 20.121,
+          "fly_over_readiness": 29.877
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 48.692,
+          "flanking_weight": 42.099,
+          "self_defense_weight": 28.995,
+          "pack_cohesion_weight": 20.481,
+          "cleave_positioning_weight": 31.129,
+          "hit_and_run_weight": 30.37,
+          "fly_over_readiness": -2.251
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 41.808,
+          "flanking_weight": 43.203,
+          "self_defense_weight": 27.023,
+          "pack_cohesion_weight": 14.624,
+          "cleave_positioning_weight": 40.5,
+          "hit_and_run_weight": 18.86,
+          "fly_over_readiness": -1.848
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 28.236,
+          "flanking_weight": 13.193,
+          "self_defense_weight": 32.464,
+          "pack_cohesion_weight": 19.167,
+          "cleave_positioning_weight": 16.133,
+          "hit_and_run_weight": 16.22,
+          "fly_over_readiness": 40.0
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 28.171,
+          "flanking_weight": 37.993,
+          "self_defense_weight": 32.996,
+          "pack_cohesion_weight": 11.232,
+          "cleave_positioning_weight": 28.42,
+          "hit_and_run_weight": 12.818,
+          "fly_over_readiness": 19.731
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 33.378,
+          "flanking_weight": 3.644,
+          "self_defense_weight": 21.479,
+          "pack_cohesion_weight": 6.248,
+          "cleave_positioning_weight": 28.41,
+          "hit_and_run_weight": 27.643,
+          "fly_over_readiness": 26.916
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 67.5,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.959,
+          "pack_cohesion_weight": 3.912,
+          "cleave_positioning_weight": 17.387,
+          "hit_and_run_weight": 7.455,
+          "fly_over_readiness": 19.12
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 37.959,
+          "flanking_weight": 4.198,
+          "self_defense_weight": 22.031,
+          "pack_cohesion_weight": 23.474,
+          "cleave_positioning_weight": 16.852,
+          "hit_and_run_weight": 23.832,
+          "fly_over_readiness": 4.843
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 45.566,
+          "flanking_weight": 16.997,
+          "self_defense_weight": 17.675,
+          "pack_cohesion_weight": 17.394,
+          "cleave_positioning_weight": 35.397,
+          "hit_and_run_weight": 37.288,
+          "fly_over_readiness": 9.99
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": 0.306,
+        "hybrid_kill_confirm_weight": 0.283,
+        "vulnerable_arc_bonus_weight": 1.207,
+        "thorns_caution_weight": 0.779,
+        "focus_fire_weight": 1.139
+      },
+      "lookahead": {
+        "lookahead_ply": 4,
+        "beam_width": 3,
+        "enemy_response_weight": 1.26,
+        "followup_discount": 0.67
+      },
+      "coordination": {
+        "activation_order_bias": 0.129,
+        "wounded_retreat_threshold": 0.28
+      }
+    },
+    {
+      "bot_id": "g8_mut_45",
+      "name": "AshenPouncer-M8P2",
+      "generation": 8,
+      "fitness": 676.17,
+      "elo_rating": 1759.5,
+      "wins_vs_classic": 20,
+      "games_vs_classic": 20,
+      "championship_streak": 1,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 1.101,
+          "mammal_02_wolf": 1.543,
+          "mammal_03_bear": 1.802,
+          "mammal_04_lion": 0.816,
+          "mammal_05_griffon": 2.071,
+          "mammal_06_owlbear": 1.325,
+          "mammal_07_behemoth": 0.747,
+          "mammal_08_displacer_beast": 1.501,
+          "mammal_09_manticore": 0.941,
+          "mammal_10_rajang": 1.976,
+          "mammal_11_dire_wolf": 1.721,
+          "mammal_12_sabertooth": 1.0,
+          "mammal_13_hell_hound": 0.766
+        },
+        "elite_vs_swarm_bias": 0.104,
+        "frontline_aggression": 0.766,
+        "tank_frontline_weight": 1.224,
+        "spread_vs_cluster": -0.272,
+        "wing_inward_facing_bias": 0.6
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 40.343,
+          "flanking_weight": 14.0,
+          "self_defense_weight": 46.32,
+          "pack_cohesion_weight": 15.534,
+          "cleave_positioning_weight": 26.674,
+          "hit_and_run_weight": 4.134,
+          "fly_over_readiness": 19.416
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 38.0,
+          "flanking_weight": 23.792,
+          "self_defense_weight": 32.06,
+          "pack_cohesion_weight": 23.295,
+          "cleave_positioning_weight": 11.11,
+          "hit_and_run_weight": 13.827,
+          "fly_over_readiness": 10.724
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 27.421,
+          "flanking_weight": 9.226,
+          "self_defense_weight": 42.57,
+          "pack_cohesion_weight": 0.431,
+          "cleave_positioning_weight": 33.624,
+          "hit_and_run_weight": 0.0,
+          "fly_over_readiness": 21.311
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 61.99,
+          "flanking_weight": 19.828,
+          "self_defense_weight": 9.054,
+          "pack_cohesion_weight": 18.066,
+          "cleave_positioning_weight": 18.129,
+          "hit_and_run_weight": 12.041,
+          "fly_over_readiness": 7.762
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 34.259,
+          "flanking_weight": 31.67,
+          "self_defense_weight": 34.294,
+          "pack_cohesion_weight": 36.263,
+          "cleave_positioning_weight": 19.527,
+          "hit_and_run_weight": 19.492,
+          "fly_over_readiness": 18.0
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 33.448,
+          "flanking_weight": 48.052,
+          "self_defense_weight": 23.406,
+          "pack_cohesion_weight": 10.854,
+          "cleave_positioning_weight": 31.129,
+          "hit_and_run_weight": 41.3,
+          "fly_over_readiness": 12.629
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 43.781,
+          "flanking_weight": 41.38,
+          "self_defense_weight": 26.488,
+          "pack_cohesion_weight": 24.59,
+          "cleave_positioning_weight": 0.398,
+          "hit_and_run_weight": 31.077,
+          "fly_over_readiness": 1.44
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 37.823,
+          "flanking_weight": 14.198,
+          "self_defense_weight": 12.186,
+          "pack_cohesion_weight": 7.58,
+          "cleave_positioning_weight": 45.98,
+          "hit_and_run_weight": 24.347,
+          "fly_over_readiness": 7.275
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 38.07,
+          "flanking_weight": 24.787,
+          "self_defense_weight": 24.77,
+          "pack_cohesion_weight": 7.194,
+          "cleave_positioning_weight": 44.624,
+          "hit_and_run_weight": 37.31,
+          "fly_over_readiness": 19.393
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 42.748,
+          "flanking_weight": 3.613,
+          "self_defense_weight": 34.027,
+          "pack_cohesion_weight": 7.073,
+          "cleave_positioning_weight": 37.009,
+          "hit_and_run_weight": 9.46,
+          "fly_over_readiness": -0.091
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 46.223,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.959,
+          "pack_cohesion_weight": 6.24,
+          "cleave_positioning_weight": 28.946,
+          "hit_and_run_weight": 19.028,
+          "fly_over_readiness": -0.756
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 21.979,
+          "flanking_weight": 21.911,
+          "self_defense_weight": 22.907,
+          "pack_cohesion_weight": 23.474,
+          "cleave_positioning_weight": 16.852,
+          "hit_and_run_weight": 11.441,
+          "fly_over_readiness": 2.227
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 17.036,
+          "self_defense_weight": 21.932,
+          "pack_cohesion_weight": 17.394,
+          "cleave_positioning_weight": 32.0,
+          "hit_and_run_weight": 37.288,
+          "fly_over_readiness": 7.06
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": -0.372,
+        "hybrid_kill_confirm_weight": 1.427,
+        "vulnerable_arc_bonus_weight": 0.916,
+        "thorns_caution_weight": 1.383,
+        "focus_fire_weight": 1.43
+      },
+      "lookahead": {
+        "lookahead_ply": 2,
+        "beam_width": 2,
+        "enemy_response_weight": 1.268,
+        "followup_discount": 0.686
+      },
+      "coordination": {
+        "activation_order_bias": -0.163,
+        "wounded_retreat_threshold": 0.242
+      }
+    },
+    {
+      "bot_id": "g2_xover_10",
+      "name": "GrimWarden-G2P2",
+      "generation": 2,
+      "fitness": 669.97,
+      "elo_rating": 1755.5,
+      "wins_vs_classic": 12,
+      "games_vs_classic": 12,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 1.0,
+          "mammal_02_wolf": 1.0,
+          "mammal_03_bear": 1.29,
+          "mammal_04_lion": 1.0,
+          "mammal_05_griffon": 1.0,
+          "mammal_06_owlbear": 1.0,
+          "mammal_07_behemoth": 1.0,
+          "mammal_08_displacer_beast": 1.405,
+          "mammal_09_manticore": 1.0,
+          "mammal_10_rajang": 1.0,
+          "mammal_11_dire_wolf": 1.117,
+          "mammal_12_sabertooth": 1.0,
+          "mammal_13_hell_hound": 1.0
+        },
+        "elite_vs_swarm_bias": -0.024,
+        "frontline_aggression": 0.817,
+        "tank_frontline_weight": 0.95,
+        "spread_vs_cluster": -0.341,
+        "wing_inward_facing_bias": 0.718
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 38.0,
+          "flanking_weight": 14.0,
+          "self_defense_weight": 16.0,
+          "pack_cohesion_weight": 19.945,
+          "cleave_positioning_weight": 14.858,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": 15.512
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 38.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 16.0,
+          "pack_cohesion_weight": 26.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": 8.878
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 14.0,
+          "self_defense_weight": 32.037,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 20.431,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 38.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 10.456,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 20.451,
+          "cleave_positioning_weight": 9.722,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": 18.0
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 19.882,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 31.844,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 2.91,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": -5.983
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 18.999,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 32.0,
+          "hit_and_run_weight": 23.831,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 6.849,
+          "hit_and_run_weight": 23.485,
+          "fly_over_readiness": 6.997
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 50.937,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 21.069,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 26.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 4.451,
+          "cleave_positioning_weight": 32.0,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": 16.262
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": 0.012,
+        "hybrid_kill_confirm_weight": 1.6,
+        "vulnerable_arc_bonus_weight": 1.273,
+        "thorns_caution_weight": 1.15,
+        "focus_fire_weight": 1.428
+      },
+      "lookahead": {
+        "lookahead_ply": 2,
+        "beam_width": 3,
+        "enemy_response_weight": 0.78,
+        "followup_discount": 0.65
+      },
+      "coordination": {
+        "activation_order_bias": -0.365,
+        "wounded_retreat_threshold": 0.22
+      }
+    },
+    {
+      "bot_id": "g10_mut_57",
+      "name": "AshenPouncer-M10P2",
+      "generation": 10,
+      "fitness": 659.39,
+      "elo_rating": 1748.6,
+      "wins_vs_classic": 4,
+      "games_vs_classic": 4,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 1.101,
+          "mammal_02_wolf": 1.0,
+          "mammal_03_bear": 1.802,
+          "mammal_04_lion": 0.816,
+          "mammal_05_griffon": 2.819,
+          "mammal_06_owlbear": 1.325,
+          "mammal_07_behemoth": 0.343,
+          "mammal_08_displacer_beast": 1.501,
+          "mammal_09_manticore": 0.385,
+          "mammal_10_rajang": 1.828,
+          "mammal_11_dire_wolf": 1.721,
+          "mammal_12_sabertooth": 1.0,
+          "mammal_13_hell_hound": 1.095
+        },
+        "elite_vs_swarm_bias": 0.104,
+        "frontline_aggression": 0.766,
+        "tank_frontline_weight": 0.489,
+        "spread_vs_cluster": -0.272,
+        "wing_inward_facing_bias": 0.6
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 40.343,
+          "flanking_weight": 18.919,
+          "self_defense_weight": 46.32,
+          "pack_cohesion_weight": 15.534,
+          "cleave_positioning_weight": 38.311,
+          "hit_and_run_weight": 0.0,
+          "fly_over_readiness": 19.416
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 38.0,
+          "flanking_weight": 12.382,
+          "self_defense_weight": 29.62,
+          "pack_cohesion_weight": 19.792,
+          "cleave_positioning_weight": 12.03,
+          "hit_and_run_weight": 13.626,
+          "fly_over_readiness": 10.724
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 27.421,
+          "flanking_weight": 9.226,
+          "self_defense_weight": 42.57,
+          "pack_cohesion_weight": 6.249,
+          "cleave_positioning_weight": 33.586,
+          "hit_and_run_weight": 7.448,
+          "fly_over_readiness": 21.311
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 52.261,
+          "flanking_weight": 19.828,
+          "self_defense_weight": 18.427,
+          "pack_cohesion_weight": 0.841,
+          "cleave_positioning_weight": 18.129,
+          "hit_and_run_weight": 12.041,
+          "fly_over_readiness": 7.762
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 34.259,
+          "flanking_weight": 26.173,
+          "self_defense_weight": 34.294,
+          "pack_cohesion_weight": 36.263,
+          "cleave_positioning_weight": 19.527,
+          "hit_and_run_weight": 19.492,
+          "fly_over_readiness": 18.0
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 34.418,
+          "flanking_weight": 48.052,
+          "self_defense_weight": 26.201,
+          "pack_cohesion_weight": 10.854,
+          "cleave_positioning_weight": 31.129,
+          "hit_and_run_weight": 41.3,
+          "fly_over_readiness": 12.629
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 23.288,
+          "flanking_weight": 28.064,
+          "self_defense_weight": 26.488,
+          "pack_cohesion_weight": 29.374,
+          "cleave_positioning_weight": 0.398,
+          "hit_and_run_weight": 23.782,
+          "fly_over_readiness": 1.44
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 43.872,
+          "flanking_weight": 14.198,
+          "self_defense_weight": 23.447,
+          "pack_cohesion_weight": 7.58,
+          "cleave_positioning_weight": 45.98,
+          "hit_and_run_weight": 28.087,
+          "fly_over_readiness": 7.275
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 53.168,
+          "flanking_weight": 21.44,
+          "self_defense_weight": 25.695,
+          "pack_cohesion_weight": 11.806,
+          "cleave_positioning_weight": 44.624,
+          "hit_and_run_weight": 37.31,
+          "fly_over_readiness": 19.393
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 42.748,
+          "flanking_weight": 3.613,
+          "self_defense_weight": 39.435,
+          "pack_cohesion_weight": 8.337,
+          "cleave_positioning_weight": 37.009,
+          "hit_and_run_weight": 9.46,
+          "fly_over_readiness": -0.091
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 46.223,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.392,
+          "pack_cohesion_weight": 6.24,
+          "cleave_positioning_weight": 28.946,
+          "hit_and_run_weight": 16.804,
+          "fly_over_readiness": 1.589
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 37.959,
+          "flanking_weight": 4.191,
+          "self_defense_weight": 22.907,
+          "pack_cohesion_weight": 23.474,
+          "cleave_positioning_weight": 16.852,
+          "hit_and_run_weight": 11.441,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 25.321,
+          "flanking_weight": 17.036,
+          "self_defense_weight": 21.932,
+          "pack_cohesion_weight": 17.394,
+          "cleave_positioning_weight": 32.0,
+          "hit_and_run_weight": 37.288,
+          "fly_over_readiness": 10.893
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": -0.273,
+        "hybrid_kill_confirm_weight": 1.642,
+        "vulnerable_arc_bonus_weight": 0.213,
+        "thorns_caution_weight": 1.383,
+        "focus_fire_weight": 1.43
+      },
+      "lookahead": {
+        "lookahead_ply": 2,
+        "beam_width": 2,
+        "enemy_response_weight": 1.268,
+        "followup_discount": 0.686
+      },
+      "coordination": {
+        "activation_order_bias": -0.163,
+        "wounded_retreat_threshold": 0.27
+      }
+    },
+    {
+      "bot_id": "g3_rand_18_p2",
+      "name": "NightPouncer-G3P2",
+      "generation": 3,
+      "fitness": 659.22,
+      "elo_rating": 1748.5,
+      "wins_vs_classic": 8,
+      "games_vs_classic": 8,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 1.553,
+          "mammal_02_wolf": 1.606,
+          "mammal_03_bear": 2.302,
+          "mammal_04_lion": 0.465,
+          "mammal_05_griffon": 2.67,
+          "mammal_06_owlbear": 2.683,
+          "mammal_07_behemoth": 1.71,
+          "mammal_08_displacer_beast": 2.006,
+          "mammal_09_manticore": 1.573,
+          "mammal_10_rajang": 2.437,
+          "mammal_11_dire_wolf": 2.453,
+          "mammal_12_sabertooth": 2.092,
+          "mammal_13_hell_hound": 2.293
+        },
+        "elite_vs_swarm_bias": -0.01,
+        "frontline_aggression": 0.685,
+        "tank_frontline_weight": 1.283,
+        "spread_vs_cluster": -0.308,
+        "wing_inward_facing_bias": 0.416
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 41.04,
+          "flanking_weight": 20.34,
+          "self_defense_weight": 43.03,
+          "pack_cohesion_weight": 21.48,
+          "cleave_positioning_weight": 51.02,
+          "hit_and_run_weight": 0.92,
+          "fly_over_readiness": 29.08
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 60.85,
+          "flanking_weight": 22.78,
+          "self_defense_weight": 29.62,
+          "pack_cohesion_weight": 20.86,
+          "cleave_positioning_weight": 12.03,
+          "hit_and_run_weight": 15.7,
+          "fly_over_readiness": 28.31
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 23.04,
+          "flanking_weight": 34.77,
+          "self_defense_weight": 42.57,
+          "pack_cohesion_weight": 12.89,
+          "cleave_positioning_weight": 40.87,
+          "hit_and_run_weight": 3.29,
+          "fly_over_readiness": 27.9
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 29.51,
+          "flanking_weight": 20.47,
+          "self_defense_weight": 42.57,
+          "pack_cohesion_weight": 34.61,
+          "cleave_positioning_weight": 8.78,
+          "hit_and_run_weight": 41.82,
+          "fly_over_readiness": 11.61
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 50.31,
+          "flanking_weight": 27.11,
+          "self_defense_weight": 36.71,
+          "pack_cohesion_weight": 31.13,
+          "cleave_positioning_weight": 20.52,
+          "hit_and_run_weight": 15.67,
+          "fly_over_readiness": -9.65
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 35.78,
+          "flanking_weight": 46.98,
+          "self_defense_weight": 31.35,
+          "pack_cohesion_weight": 24.8,
+          "cleave_positioning_weight": 41.9,
+          "hit_and_run_weight": 41.3,
+          "fly_over_readiness": 25.9
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 54.59,
+          "flanking_weight": 41.38,
+          "self_defense_weight": 42.86,
+          "pack_cohesion_weight": 32.97,
+          "cleave_positioning_weight": 8.85,
+          "hit_and_run_weight": 13.57,
+          "fly_over_readiness": 2.79
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 35.47,
+          "flanking_weight": 47.58,
+          "self_defense_weight": 20.54,
+          "pack_cohesion_weight": 5.58,
+          "cleave_positioning_weight": 50.15,
+          "hit_and_run_weight": 41.81,
+          "fly_over_readiness": 6.69
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 38.07,
+          "flanking_weight": 25.65,
+          "self_defense_weight": 25.56,
+          "pack_cohesion_weight": 14.96,
+          "cleave_positioning_weight": 47.53,
+          "hit_and_run_weight": 37.31,
+          "fly_over_readiness": 12.07
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 51.54,
+          "flanking_weight": 4.39,
+          "self_defense_weight": 41.23,
+          "pack_cohesion_weight": 2.32,
+          "cleave_positioning_weight": 45.94,
+          "hit_and_run_weight": 9.46,
+          "fly_over_readiness": 29.1
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 63.1,
+          "flanking_weight": 29.34,
+          "self_defense_weight": 23.76,
+          "pack_cohesion_weight": 6.24,
+          "cleave_positioning_weight": 9.31,
+          "hit_and_run_weight": 4.86,
+          "fly_over_readiness": -3.29
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 44.21,
+          "flanking_weight": 23.01,
+          "self_defense_weight": 26.33,
+          "pack_cohesion_weight": 28.79,
+          "cleave_positioning_weight": 45.19,
+          "hit_and_run_weight": 9.84,
+          "fly_over_readiness": 16.88
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 47.91,
+          "flanking_weight": 18.48,
+          "self_defense_weight": 21.76,
+          "pack_cohesion_weight": 32.6,
+          "cleave_positioning_weight": 47.35,
+          "hit_and_run_weight": 33.5,
+          "fly_over_readiness": 18.63
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": -0.322,
+        "hybrid_kill_confirm_weight": 1.541,
+        "vulnerable_arc_bonus_weight": 0.785,
+        "thorns_caution_weight": 2.111,
+        "focus_fire_weight": 1.377
+      },
+      "lookahead": {
+        "lookahead_ply": 2,
+        "beam_width": 4,
+        "enemy_response_weight": 1.268,
+        "followup_discount": 0.723
+      },
+      "coordination": {
+        "activation_order_bias": -0.489,
+        "wounded_retreat_threshold": 0.297
+      }
+    },
+    {
+      "bot_id": "g9_rand_55_p3",
+      "name": "FeralStalker-G9P3",
+      "generation": 9,
+      "fitness": 656.46,
+      "elo_rating": 1746.7,
+      "wins_vs_classic": 4,
+      "games_vs_classic": 4,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 2.223,
+          "mammal_02_wolf": 2.481,
+          "mammal_03_bear": 1.206,
+          "mammal_04_lion": 1.169,
+          "mammal_05_griffon": 2.513,
+          "mammal_06_owlbear": 1.378,
+          "mammal_07_behemoth": 1.904,
+          "mammal_08_displacer_beast": 2.199,
+          "mammal_09_manticore": 0.559,
+          "mammal_10_rajang": 1.756,
+          "mammal_11_dire_wolf": 1.953,
+          "mammal_12_sabertooth": 1.917,
+          "mammal_13_hell_hound": 1.384
+        },
+        "elite_vs_swarm_bias": -0.105,
+        "frontline_aggression": 0.417,
+        "tank_frontline_weight": 0.279,
+        "spread_vs_cluster": -0.311,
+        "wing_inward_facing_bias": 0.203
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 23.51,
+          "flanking_weight": 7.67,
+          "self_defense_weight": 33.43,
+          "pack_cohesion_weight": 4.3,
+          "cleave_positioning_weight": 51.17,
+          "hit_and_run_weight": 0.04,
+          "fly_over_readiness": 2.35
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 17.38,
+          "flanking_weight": 21.08,
+          "self_defense_weight": 8.04,
+          "pack_cohesion_weight": 3.99,
+          "cleave_positioning_weight": 36.05,
+          "hit_and_run_weight": 35.41,
+          "fly_over_readiness": 14.56
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 26.64,
+          "flanking_weight": 38.5,
+          "self_defense_weight": 38.47,
+          "pack_cohesion_weight": 34.56,
+          "cleave_positioning_weight": 11.94,
+          "hit_and_run_weight": 38.1,
+          "fly_over_readiness": 6.42
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 51.1,
+          "flanking_weight": 39.55,
+          "self_defense_weight": 33.15,
+          "pack_cohesion_weight": 29.67,
+          "cleave_positioning_weight": 4.56,
+          "hit_and_run_weight": 35.7,
+          "fly_over_readiness": 17.31
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 38.77,
+          "flanking_weight": 30.83,
+          "self_defense_weight": 41.6,
+          "pack_cohesion_weight": 29.63,
+          "cleave_positioning_weight": 19.03,
+          "hit_and_run_weight": 12.86,
+          "fly_over_readiness": 13.89
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 20.29,
+          "flanking_weight": 15.76,
+          "self_defense_weight": 31.31,
+          "pack_cohesion_weight": 13.23,
+          "cleave_positioning_weight": 16.49,
+          "hit_and_run_weight": 6.24,
+          "fly_over_readiness": -3.83
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 20.1,
+          "flanking_weight": 47.38,
+          "self_defense_weight": 43.26,
+          "pack_cohesion_weight": 18.69,
+          "cleave_positioning_weight": 6.66,
+          "hit_and_run_weight": 5.17,
+          "fly_over_readiness": 11.47
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 62.93,
+          "flanking_weight": 25.49,
+          "self_defense_weight": 33.02,
+          "pack_cohesion_weight": 38.8,
+          "cleave_positioning_weight": 45.72,
+          "hit_and_run_weight": 39.53,
+          "fly_over_readiness": 3.97
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 32.78,
+          "flanking_weight": 14.62,
+          "self_defense_weight": 19.58,
+          "pack_cohesion_weight": 18.13,
+          "cleave_positioning_weight": 33.44,
+          "hit_and_run_weight": 32.36,
+          "fly_over_readiness": 16.55
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 59.3,
+          "flanking_weight": 26.55,
+          "self_defense_weight": 5.03,
+          "pack_cohesion_weight": 26.95,
+          "cleave_positioning_weight": 22.95,
+          "hit_and_run_weight": 14.94,
+          "fly_over_readiness": 10.37
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 37.01,
+          "flanking_weight": 25.65,
+          "self_defense_weight": 8.9,
+          "pack_cohesion_weight": 24.08,
+          "cleave_positioning_weight": 51.49,
+          "hit_and_run_weight": 34.65,
+          "fly_over_readiness": 5.27
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 47.99,
+          "flanking_weight": 9.51,
+          "self_defense_weight": 37.15,
+          "pack_cohesion_weight": 0.55,
+          "cleave_positioning_weight": 18.89,
+          "hit_and_run_weight": 34.85,
+          "fly_over_readiness": 8.66
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 22.72,
+          "flanking_weight": 6.35,
+          "self_defense_weight": 15.92,
+          "pack_cohesion_weight": 9.8,
+          "cleave_positioning_weight": 20.97,
+          "hit_and_run_weight": 25.57,
+          "fly_over_readiness": 12.03
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": -0.913,
+        "hybrid_kill_confirm_weight": 1.654,
+        "vulnerable_arc_bonus_weight": 0.547,
+        "thorns_caution_weight": 0.998,
+        "focus_fire_weight": 1.262
+      },
+      "lookahead": {
+        "lookahead_ply": 3,
+        "beam_width": 3,
+        "enemy_response_weight": 0.746,
+        "followup_discount": 0.82
+      },
+      "coordination": {
+        "activation_order_bias": 0.257,
+        "wounded_retreat_threshold": 0.356
+      }
+    },
+    {
+      "bot_id": "g1_xover_4",
+      "name": "NightRavager-G1P2",
+      "generation": 1,
+      "fitness": 656.38,
+      "elo_rating": 1746.6,
+      "wins_vs_classic": 4,
+      "games_vs_classic": 4,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 1.406,
+          "mammal_02_wolf": 1.0,
+          "mammal_03_bear": 1.0,
+          "mammal_04_lion": 1.0,
+          "mammal_05_griffon": 1.0,
+          "mammal_06_owlbear": 1.0,
+          "mammal_07_behemoth": 1.0,
+          "mammal_08_displacer_beast": 1.337,
+          "mammal_09_manticore": 1.0,
+          "mammal_10_rajang": 1.0,
+          "mammal_11_dire_wolf": 1.0,
+          "mammal_12_sabertooth": 1.0,
+          "mammal_13_hell_hound": 1.0
+        },
+        "elite_vs_swarm_bias": 0.25,
+        "frontline_aggression": 0.826,
+        "tank_frontline_weight": 0.872,
+        "spread_vs_cluster": -0.818,
+        "wing_inward_facing_bias": 0.58
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 38.0,
+          "flanking_weight": 14.0,
+          "self_defense_weight": 16.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 2.808,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 36.363,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 16.552,
+          "pack_cohesion_weight": 26.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": -0.033
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 14.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 0.0,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": -3.154
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 41.581,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 16.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 24.179,
+          "fly_over_readiness": 18.0
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 32.163,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 17.556,
+          "cleave_positioning_weight": 25.429,
+          "hit_and_run_weight": 10.0,
+          "fly_over_readiness": 6.463
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 32.0,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": -8.965
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": 18.0
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 17.72,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 2.863,
+          "hit_and_run_weight": 19.517,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 18.866,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 26.0,
+          "cleave_positioning_weight": 14.0,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 7.909,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 13.787,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 22.0,
+          "pack_cohesion_weight": 10.0,
+          "cleave_positioning_weight": 20.545,
+          "hit_and_run_weight": 22.0,
+          "fly_over_readiness": 0.0
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": 0.146,
+        "hybrid_kill_confirm_weight": 1.735,
+        "vulnerable_arc_bonus_weight": 1.318,
+        "thorns_caution_weight": 1.119,
+        "focus_fire_weight": 1.475
+      },
+      "lookahead": {
+        "lookahead_ply": 2,
+        "beam_width": 3,
+        "enemy_response_weight": 0.662,
+        "followup_discount": 0.65
+      },
+      "coordination": {
+        "activation_order_bias": 0.123,
+        "wounded_retreat_threshold": 0.25
+      }
+    },
+    {
+      "bot_id": "g4_xover_22",
+      "name": "VenomMaw-G4P2",
+      "generation": 4,
+      "fitness": 650.95,
+      "elo_rating": 1743.1,
+      "wins_vs_classic": 4,
+      "games_vs_classic": 4,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 1.732,
+          "mammal_02_wolf": 1.427,
+          "mammal_03_bear": 2.024,
+          "mammal_04_lion": 0.668,
+          "mammal_05_griffon": 1.801,
+          "mammal_06_owlbear": 2.26,
+          "mammal_07_behemoth": 1.206,
+          "mammal_08_displacer_beast": 1.567,
+          "mammal_09_manticore": 1.573,
+          "mammal_10_rajang": 2.437,
+          "mammal_11_dire_wolf": 2.046,
+          "mammal_12_sabertooth": 1.433,
+          "mammal_13_hell_hound": 1.608
+        },
+        "elite_vs_swarm_bias": -0.01,
+        "frontline_aggression": 0.813,
+        "tank_frontline_weight": 1.735,
+        "spread_vs_cluster": -0.317,
+        "wing_inward_facing_bias": 0.464
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 41.545,
+          "flanking_weight": 24.803,
+          "self_defense_weight": 18.591,
+          "pack_cohesion_weight": 37.623,
+          "cleave_positioning_weight": 33.846,
+          "hit_and_run_weight": 9.604,
+          "fly_over_readiness": 31.511
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 52.501,
+          "flanking_weight": 22.482,
+          "self_defense_weight": 19.214,
+          "pack_cohesion_weight": 17.594,
+          "cleave_positioning_weight": 16.69,
+          "hit_and_run_weight": 4.983,
+          "fly_over_readiness": 7.54
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 52.326,
+          "flanking_weight": 28.318,
+          "self_defense_weight": 26.38,
+          "pack_cohesion_weight": 11.951,
+          "cleave_positioning_weight": 38.149,
+          "hit_and_run_weight": 11.195,
+          "fly_over_readiness": 21.211
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 43.29,
+          "flanking_weight": 20.149,
+          "self_defense_weight": 44.224,
+          "pack_cohesion_weight": 34.61,
+          "cleave_positioning_weight": 1.052,
+          "hit_and_run_weight": 30.738,
+          "fly_over_readiness": 8.29
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 46.623,
+          "flanking_weight": 22.609,
+          "self_defense_weight": 25.287,
+          "pack_cohesion_weight": 23.485,
+          "cleave_positioning_weight": 20.243,
+          "hit_and_run_weight": 0.476,
+          "fly_over_readiness": -2.051
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 30.192,
+          "flanking_weight": 40.378,
+          "self_defense_weight": 29.859,
+          "pack_cohesion_weight": 24.592,
+          "cleave_positioning_weight": 15.343,
+          "hit_and_run_weight": 26.465,
+          "fly_over_readiness": 14.936
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 49.947,
+          "flanking_weight": 16.249,
+          "self_defense_weight": 11.818,
+          "pack_cohesion_weight": 25.954,
+          "cleave_positioning_weight": 14.452,
+          "hit_and_run_weight": 8.95,
+          "fly_over_readiness": 2.79
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 35.772,
+          "flanking_weight": 36.986,
+          "self_defense_weight": 17.617,
+          "pack_cohesion_weight": 21.886,
+          "cleave_positioning_weight": 41.684,
+          "hit_and_run_weight": 32.703,
+          "fly_over_readiness": 19.261
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 33.631,
+          "flanking_weight": 4.02,
+          "self_defense_weight": 27.435,
+          "pack_cohesion_weight": 13.727,
+          "cleave_positioning_weight": 25.179,
+          "hit_and_run_weight": 23.119,
+          "fly_over_readiness": 11.561
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 26.976,
+          "flanking_weight": 9.544,
+          "self_defense_weight": 39.23,
+          "pack_cohesion_weight": 5.293,
+          "cleave_positioning_weight": 23.421,
+          "hit_and_run_weight": 24.951,
+          "fly_over_readiness": 12.507
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 36.05,
+          "flanking_weight": 29.698,
+          "self_defense_weight": 22.582,
+          "pack_cohesion_weight": 41.962,
+          "cleave_positioning_weight": 10.612,
+          "hit_and_run_weight": 10.222,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 21.404,
+          "flanking_weight": 26.738,
+          "self_defense_weight": 4.211,
+          "pack_cohesion_weight": 18.556,
+          "cleave_positioning_weight": 37.043,
+          "hit_and_run_weight": 9.84,
+          "fly_over_readiness": 6.792
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 42.889,
+          "flanking_weight": 18.012,
+          "self_defense_weight": 21.854,
+          "pack_cohesion_weight": 29.785,
+          "cleave_positioning_weight": 36.488,
+          "hit_and_run_weight": 19.943,
+          "fly_over_readiness": 13.917
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": -0.411,
+        "hybrid_kill_confirm_weight": 1.541,
+        "vulnerable_arc_bonus_weight": 1.331,
+        "thorns_caution_weight": 1.811,
+        "focus_fire_weight": 1.377
+      },
+      "lookahead": {
+        "lookahead_ply": 2,
+        "beam_width": 3,
+        "enemy_response_weight": 1.255,
+        "followup_discount": 0.595
+      },
+      "coordination": {
+        "activation_order_bias": -0.348,
+        "wounded_retreat_threshold": 0.369
+      }
+    },
+    {
+      "bot_id": "g9_mut_51",
+      "name": "AshenPouncer-M9P2",
+      "generation": 9,
+      "fitness": 650.35,
+      "elo_rating": 1742.7,
+      "wins_vs_classic": 16,
+      "games_vs_classic": 16,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 1.101,
+          "mammal_02_wolf": 1.0,
+          "mammal_03_bear": 1.802,
+          "mammal_04_lion": 0.816,
+          "mammal_05_griffon": 2.071,
+          "mammal_06_owlbear": 1.325,
+          "mammal_07_behemoth": 0.747,
+          "mammal_08_displacer_beast": 1.501,
+          "mammal_09_manticore": 0.941,
+          "mammal_10_rajang": 1.976,
+          "mammal_11_dire_wolf": 1.721,
+          "mammal_12_sabertooth": 1.0,
+          "mammal_13_hell_hound": 1.095
+        },
+        "elite_vs_swarm_bias": 0.104,
+        "frontline_aggression": 0.691,
+        "tank_frontline_weight": 0.964,
+        "spread_vs_cluster": -0.272,
+        "wing_inward_facing_bias": 0.6
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 40.343,
+          "flanking_weight": 14.0,
+          "self_defense_weight": 46.32,
+          "pack_cohesion_weight": 15.534,
+          "cleave_positioning_weight": 38.311,
+          "hit_and_run_weight": 4.134,
+          "fly_over_readiness": 19.416
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 38.0,
+          "flanking_weight": 23.792,
+          "self_defense_weight": 29.62,
+          "pack_cohesion_weight": 18.133,
+          "cleave_positioning_weight": 12.03,
+          "hit_and_run_weight": 13.626,
+          "fly_over_readiness": 10.724
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 27.421,
+          "flanking_weight": 9.226,
+          "self_defense_weight": 42.57,
+          "pack_cohesion_weight": 6.249,
+          "cleave_positioning_weight": 33.624,
+          "hit_and_run_weight": 7.448,
+          "fly_over_readiness": 21.311
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 52.261,
+          "flanking_weight": 19.828,
+          "self_defense_weight": 18.427,
+          "pack_cohesion_weight": 18.066,
+          "cleave_positioning_weight": 10.982,
+          "hit_and_run_weight": 12.041,
+          "fly_over_readiness": 7.762
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 34.259,
+          "flanking_weight": 26.173,
+          "self_defense_weight": 33.691,
+          "pack_cohesion_weight": 36.263,
+          "cleave_positioning_weight": 19.527,
+          "hit_and_run_weight": 22.184,
+          "fly_over_readiness": 18.0
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 34.418,
+          "flanking_weight": 48.052,
+          "self_defense_weight": 23.406,
+          "pack_cohesion_weight": 10.854,
+          "cleave_positioning_weight": 31.129,
+          "hit_and_run_weight": 41.3,
+          "fly_over_readiness": 22.222
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 47.054,
+          "flanking_weight": 41.38,
+          "self_defense_weight": 26.488,
+          "pack_cohesion_weight": 29.374,
+          "cleave_positioning_weight": 21.921,
+          "hit_and_run_weight": 23.782,
+          "fly_over_readiness": 8.623
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 21.321,
+          "flanking_weight": 14.198,
+          "self_defense_weight": 23.447,
+          "pack_cohesion_weight": 7.58,
+          "cleave_positioning_weight": 45.98,
+          "hit_and_run_weight": 28.087,
+          "fly_over_readiness": 7.275
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 38.07,
+          "flanking_weight": 24.787,
+          "self_defense_weight": 26.02,
+          "pack_cohesion_weight": 11.806,
+          "cleave_positioning_weight": 44.624,
+          "hit_and_run_weight": 37.31,
+          "fly_over_readiness": 19.393
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 40.474,
+          "flanking_weight": 0.0,
+          "self_defense_weight": 39.435,
+          "pack_cohesion_weight": 8.337,
+          "cleave_positioning_weight": 25.137,
+          "hit_and_run_weight": 9.46,
+          "fly_over_readiness": 16.444
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 46.223,
+          "flanking_weight": 24.0,
+          "self_defense_weight": 18.999,
+          "pack_cohesion_weight": 6.24,
+          "cleave_positioning_weight": 28.946,
+          "hit_and_run_weight": 0.0,
+          "fly_over_readiness": -0.756
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 37.959,
+          "flanking_weight": 21.911,
+          "self_defense_weight": 25.506,
+          "pack_cohesion_weight": 23.474,
+          "cleave_positioning_weight": 16.852,
+          "hit_and_run_weight": 11.441,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 31.874,
+          "flanking_weight": 17.036,
+          "self_defense_weight": 21.932,
+          "pack_cohesion_weight": 17.394,
+          "cleave_positioning_weight": 32.0,
+          "hit_and_run_weight": 37.288,
+          "fly_over_readiness": 10.893
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": -0.273,
+        "hybrid_kill_confirm_weight": 1.427,
+        "vulnerable_arc_bonus_weight": 1.168,
+        "thorns_caution_weight": 1.997,
+        "focus_fire_weight": 1.43
+      },
+      "lookahead": {
+        "lookahead_ply": 2,
+        "beam_width": 2,
+        "enemy_response_weight": 1.308,
+        "followup_discount": 0.663
+      },
+      "coordination": {
+        "activation_order_bias": 0.281,
+        "wounded_retreat_threshold": 0.25
+      }
+    },
+    {
+      "bot_id": "g9_xover_52",
+      "name": "StormAlpha-G9P2",
+      "generation": 9,
+      "fitness": 647.92,
+      "elo_rating": 1741.1,
+      "wins_vs_classic": 4,
+      "games_vs_classic": 4,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 0.907,
+          "mammal_02_wolf": 1.899,
+          "mammal_03_bear": 1.353,
+          "mammal_04_lion": 1.589,
+          "mammal_05_griffon": 2.121,
+          "mammal_06_owlbear": 0.995,
+          "mammal_07_behemoth": 0.816,
+          "mammal_08_displacer_beast": 1.826,
+          "mammal_09_manticore": 2.119,
+          "mammal_10_rajang": 0.825,
+          "mammal_11_dire_wolf": 1.805,
+          "mammal_12_sabertooth": 1.551,
+          "mammal_13_hell_hound": 1.348
+        },
+        "elite_vs_swarm_bias": 0.781,
+        "frontline_aggression": 0.764,
+        "tank_frontline_weight": -0.056,
+        "spread_vs_cluster": -0.114,
+        "wing_inward_facing_bias": 0.374
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 50.983,
+          "flanking_weight": 40.89,
+          "self_defense_weight": 2.0,
+          "pack_cohesion_weight": 2.9,
+          "cleave_positioning_weight": 21.192,
+          "hit_and_run_weight": 22.004,
+          "fly_over_readiness": 13.63
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 40.926,
+          "flanking_weight": 23.792,
+          "self_defense_weight": 19.621,
+          "pack_cohesion_weight": 22.483,
+          "cleave_positioning_weight": 19.133,
+          "hit_and_run_weight": 38.665,
+          "fly_over_readiness": 1.06
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 40.736,
+          "flanking_weight": 11.757,
+          "self_defense_weight": 26.84,
+          "pack_cohesion_weight": 33.104,
+          "cleave_positioning_weight": 33.693,
+          "hit_and_run_weight": 7.98,
+          "fly_over_readiness": 25.956
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 55.014,
+          "flanking_weight": 23.446,
+          "self_defense_weight": 27.596,
+          "pack_cohesion_weight": 19.037,
+          "cleave_positioning_weight": 19.48,
+          "hit_and_run_weight": 0.0,
+          "fly_over_readiness": 14.45
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 31.099,
+          "flanking_weight": 0.0,
+          "self_defense_weight": 21.443,
+          "pack_cohesion_weight": 14.964,
+          "cleave_positioning_weight": 15.235,
+          "hit_and_run_weight": 28.668,
+          "fly_over_readiness": 25.467
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 60.49,
+          "flanking_weight": 33.831,
+          "self_defense_weight": 32.458,
+          "pack_cohesion_weight": 13.867,
+          "cleave_positioning_weight": 32.682,
+          "hit_and_run_weight": 30.519,
+          "fly_over_readiness": 16.855
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 61.062,
+          "flanking_weight": 36.291,
+          "self_defense_weight": 13.563,
+          "pack_cohesion_weight": 18.758,
+          "cleave_positioning_weight": 21.863,
+          "hit_and_run_weight": 32.001,
+          "fly_over_readiness": 18.368
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 24.625,
+          "flanking_weight": 27.251,
+          "self_defense_weight": 21.497,
+          "pack_cohesion_weight": 13.033,
+          "cleave_positioning_weight": 36.617,
+          "hit_and_run_weight": 41.62,
+          "fly_over_readiness": 17.055
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 35.466,
+          "flanking_weight": 50.561,
+          "self_defense_weight": 34.118,
+          "pack_cohesion_weight": 8.785,
+          "cleave_positioning_weight": 28.092,
+          "hit_and_run_weight": 17.979,
+          "fly_over_readiness": 27.717
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 25.3,
+          "flanking_weight": 28.279,
+          "self_defense_weight": 27.262,
+          "pack_cohesion_weight": 19.052,
+          "cleave_positioning_weight": 41.683,
+          "hit_and_run_weight": 29.701,
+          "fly_over_readiness": 3.149
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 32.838,
+          "flanking_weight": 11.964,
+          "self_defense_weight": 14.902,
+          "pack_cohesion_weight": 7.858,
+          "cleave_positioning_weight": 28.549,
+          "hit_and_run_weight": 23.139,
+          "fly_over_readiness": 13.98
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 24.7,
+          "flanking_weight": 25.716,
+          "self_defense_weight": 35.164,
+          "pack_cohesion_weight": 32.684,
+          "cleave_positioning_weight": 24.022,
+          "hit_and_run_weight": 36.18,
+          "fly_over_readiness": -15.0
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 34.0,
+          "flanking_weight": 25.625,
+          "self_defense_weight": 37.221,
+          "pack_cohesion_weight": 8.42,
+          "cleave_positioning_weight": 27.276,
+          "hit_and_run_weight": 33.048,
+          "fly_over_readiness": 2.793
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": 0.134,
+        "hybrid_kill_confirm_weight": 1.42,
+        "vulnerable_arc_bonus_weight": 1.292,
+        "thorns_caution_weight": 1.304,
+        "focus_fire_weight": 1.684
+      },
+      "lookahead": {
+        "lookahead_ply": 2,
+        "beam_width": 3,
+        "enemy_response_weight": 1.1,
+        "followup_discount": 0.558
+      },
+      "coordination": {
+        "activation_order_bias": 0.437,
+        "wounded_retreat_threshold": 0.312
+      }
+    },
+    {
+      "bot_id": "g12_xover_70",
+      "name": "BloodPouncer-G12P4",
+      "generation": 12,
+      "fitness": 645.85,
+      "elo_rating": 1739.8,
+      "wins_vs_classic": 4,
+      "games_vs_classic": 4,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 1.501,
+          "mammal_02_wolf": 1.072,
+          "mammal_03_bear": 1.84,
+          "mammal_04_lion": 1.06,
+          "mammal_05_griffon": 3.103,
+          "mammal_06_owlbear": 0.682,
+          "mammal_07_behemoth": 0.567,
+          "mammal_08_displacer_beast": 1.101,
+          "mammal_09_manticore": 0.683,
+          "mammal_10_rajang": 1.029,
+          "mammal_11_dire_wolf": 1.659,
+          "mammal_12_sabertooth": 2.018,
+          "mammal_13_hell_hound": 1.588
+        },
+        "elite_vs_swarm_bias": 0.29,
+        "frontline_aggression": 0.634,
+        "tank_frontline_weight": 1.44,
+        "spread_vs_cluster": -0.272,
+        "wing_inward_facing_bias": 0.535
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 36.187,
+          "flanking_weight": 27.697,
+          "self_defense_weight": 45.665,
+          "pack_cohesion_weight": 15.534,
+          "cleave_positioning_weight": 43.894,
+          "hit_and_run_weight": 13.507,
+          "fly_over_readiness": 5.919
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 41.875,
+          "flanking_weight": 26.323,
+          "self_defense_weight": 32.112,
+          "pack_cohesion_weight": 16.814,
+          "cleave_positioning_weight": 3.088,
+          "hit_and_run_weight": 18.084,
+          "fly_over_readiness": 9.797
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 30.139,
+          "flanking_weight": 16.285,
+          "self_defense_weight": 42.254,
+          "pack_cohesion_weight": 6.332,
+          "cleave_positioning_weight": 34.752,
+          "hit_and_run_weight": 12.1,
+          "fly_over_readiness": 19.988
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 49.323,
+          "flanking_weight": 30.781,
+          "self_defense_weight": 31.553,
+          "pack_cohesion_weight": 17.92,
+          "cleave_positioning_weight": 20.519,
+          "hit_and_run_weight": 13.037,
+          "fly_over_readiness": 7.762
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 38.653,
+          "flanking_weight": 28.196,
+          "self_defense_weight": 30.579,
+          "pack_cohesion_weight": 17.47,
+          "cleave_positioning_weight": 25.148,
+          "hit_and_run_weight": 19.754,
+          "fly_over_readiness": 29.588
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 42.712,
+          "flanking_weight": 49.248,
+          "self_defense_weight": 22.926,
+          "pack_cohesion_weight": 15.3,
+          "cleave_positioning_weight": 30.275,
+          "hit_and_run_weight": 21.483,
+          "fly_over_readiness": 15.016
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 31.374,
+          "flanking_weight": 33.857,
+          "self_defense_weight": 26.488,
+          "pack_cohesion_weight": 19.826,
+          "cleave_positioning_weight": 31.191,
+          "hit_and_run_weight": 25.21,
+          "fly_over_readiness": 1.44
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 33.151,
+          "flanking_weight": 13.119,
+          "self_defense_weight": 21.902,
+          "pack_cohesion_weight": 11.169,
+          "cleave_positioning_weight": 34.923,
+          "hit_and_run_weight": 21.736,
+          "fly_over_readiness": 32.835
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 25.493,
+          "flanking_weight": 32.576,
+          "self_defense_weight": 26.02,
+          "pack_cohesion_weight": 11.668,
+          "cleave_positioning_weight": 28.42,
+          "hit_and_run_weight": 19.72,
+          "fly_over_readiness": 19.491
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 20.075,
+          "flanking_weight": 3.613,
+          "self_defense_weight": 32.491,
+          "pack_cohesion_weight": 12.105,
+          "cleave_positioning_weight": 37.009,
+          "hit_and_run_weight": 17.515,
+          "fly_over_readiness": 12.242
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 49.651,
+          "flanking_weight": 23.689,
+          "self_defense_weight": 22.959,
+          "pack_cohesion_weight": 12.172,
+          "cleave_positioning_weight": 40.703,
+          "hit_and_run_weight": 10.727,
+          "fly_over_readiness": 10.243
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 37.959,
+          "flanking_weight": 15.241,
+          "self_defense_weight": 20.399,
+          "pack_cohesion_weight": 29.458,
+          "cleave_positioning_weight": 16.852,
+          "hit_and_run_weight": 17.763,
+          "fly_over_readiness": 0.0
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 45.566,
+          "flanking_weight": 10.737,
+          "self_defense_weight": 17.853,
+          "pack_cohesion_weight": 18.498,
+          "cleave_positioning_weight": 34.717,
+          "hit_and_run_weight": 36.655,
+          "fly_over_readiness": 10.893
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": -0.273,
+        "hybrid_kill_confirm_weight": 1.369,
+        "vulnerable_arc_bonus_weight": 1.067,
+        "thorns_caution_weight": 0.86,
+        "focus_fire_weight": 1.281
+      },
+      "lookahead": {
+        "lookahead_ply": 4,
+        "beam_width": 2,
+        "enemy_response_weight": 1.265,
+        "followup_discount": 0.683
+      },
+      "coordination": {
+        "activation_order_bias": 0.137,
+        "wounded_retreat_threshold": 0.266
+      }
+    },
+    {
+      "bot_id": "g10_mut_56",
+      "name": "FeralFang-M10P4",
+      "generation": 10,
+      "fitness": 644.61,
+      "elo_rating": 1739.0,
+      "wins_vs_classic": 4,
+      "games_vs_classic": 4,
+      "championship_streak": 0,
+      "setup": {
+        "mammal_purchase_weights": {
+          "mammal_01_rat": 2.331,
+          "mammal_02_wolf": 0.778,
+          "mammal_03_bear": 1.883,
+          "mammal_04_lion": 1.22,
+          "mammal_05_griffon": 2.679,
+          "mammal_06_owlbear": 0.682,
+          "mammal_07_behemoth": 0.63,
+          "mammal_08_displacer_beast": 2.299,
+          "mammal_09_manticore": 0.354,
+          "mammal_10_rajang": 0.283,
+          "mammal_11_dire_wolf": 2.684,
+          "mammal_12_sabertooth": 1.331,
+          "mammal_13_hell_hound": 2.367
+        },
+        "elite_vs_swarm_bias": -0.039,
+        "frontline_aggression": 0.528,
+        "tank_frontline_weight": 0.58,
+        "spread_vs_cluster": -0.315,
+        "wing_inward_facing_bias": 0.709
+      },
+      "mammal_genes": {
+        "mammal_01_rat": {
+          "aggression_weight": 23.77,
+          "flanking_weight": 32.11,
+          "self_defense_weight": 22.64,
+          "pack_cohesion_weight": 28.89,
+          "cleave_positioning_weight": 49.72,
+          "hit_and_run_weight": 26.86,
+          "fly_over_readiness": 20.87
+        },
+        "mammal_02_wolf": {
+          "aggression_weight": 44.974,
+          "flanking_weight": 30.13,
+          "self_defense_weight": 10.46,
+          "pack_cohesion_weight": 15.16,
+          "cleave_positioning_weight": 40.89,
+          "hit_and_run_weight": 30.661,
+          "fly_over_readiness": -2.76
+        },
+        "mammal_03_bear": {
+          "aggression_weight": 43.583,
+          "flanking_weight": 30.68,
+          "self_defense_weight": 40.165,
+          "pack_cohesion_weight": 15.33,
+          "cleave_positioning_weight": 51.26,
+          "hit_and_run_weight": 40.3,
+          "fly_over_readiness": 21.62
+        },
+        "mammal_04_lion": {
+          "aggression_weight": 33.13,
+          "flanking_weight": 36.654,
+          "self_defense_weight": 35.49,
+          "pack_cohesion_weight": 25.669,
+          "cleave_positioning_weight": 26.834,
+          "hit_and_run_weight": 19.57,
+          "fly_over_readiness": 15.04
+        },
+        "mammal_05_griffon": {
+          "aggression_weight": 48.4,
+          "flanking_weight": 36.98,
+          "self_defense_weight": 32.67,
+          "pack_cohesion_weight": 6.35,
+          "cleave_positioning_weight": 41.74,
+          "hit_and_run_weight": 20.31,
+          "fly_over_readiness": 33.07
+        },
+        "mammal_06_owlbear": {
+          "aggression_weight": 44.509,
+          "flanking_weight": 22.57,
+          "self_defense_weight": 43.65,
+          "pack_cohesion_weight": 37.42,
+          "cleave_positioning_weight": 16.41,
+          "hit_and_run_weight": 21.16,
+          "fly_over_readiness": -14.603
+        },
+        "mammal_07_behemoth": {
+          "aggression_weight": 36.26,
+          "flanking_weight": 19.25,
+          "self_defense_weight": 27.78,
+          "pack_cohesion_weight": 14.88,
+          "cleave_positioning_weight": 28.532,
+          "hit_and_run_weight": 18.86,
+          "fly_over_readiness": -5.73
+        },
+        "mammal_08_displacer_beast": {
+          "aggression_weight": 22.57,
+          "flanking_weight": 39.29,
+          "self_defense_weight": 6.68,
+          "pack_cohesion_weight": 16.781,
+          "cleave_positioning_weight": 8.5,
+          "hit_and_run_weight": 9.87,
+          "fly_over_readiness": 16.55
+        },
+        "mammal_09_manticore": {
+          "aggression_weight": 18.59,
+          "flanking_weight": 44.85,
+          "self_defense_weight": 37.69,
+          "pack_cohesion_weight": 10.49,
+          "cleave_positioning_weight": 19.91,
+          "hit_and_run_weight": 2.804,
+          "fly_over_readiness": 31.76
+        },
+        "mammal_10_rajang": {
+          "aggression_weight": 18.42,
+          "flanking_weight": 17.15,
+          "self_defense_weight": 12.3,
+          "pack_cohesion_weight": 3.4,
+          "cleave_positioning_weight": 28.41,
+          "hit_and_run_weight": 25.24,
+          "fly_over_readiness": 32.11
+        },
+        "mammal_11_dire_wolf": {
+          "aggression_weight": 71.83,
+          "flanking_weight": 46.64,
+          "self_defense_weight": 15.58,
+          "pack_cohesion_weight": 0.0,
+          "cleave_positioning_weight": 26.15,
+          "hit_and_run_weight": 0.0,
+          "fly_over_readiness": 24.12
+        },
+        "mammal_12_sabertooth": {
+          "aggression_weight": 16.97,
+          "flanking_weight": 5.814,
+          "self_defense_weight": 12.21,
+          "pack_cohesion_weight": 1.8,
+          "cleave_positioning_weight": 18.36,
+          "hit_and_run_weight": 22.53,
+          "fly_over_readiness": 10.277
+        },
+        "mammal_13_hell_hound": {
+          "aggression_weight": 32.22,
+          "flanking_weight": 4.18,
+          "self_defense_weight": 4.2,
+          "pack_cohesion_weight": 31.988,
+          "cleave_positioning_weight": 45.33,
+          "hit_and_run_weight": 17.956,
+          "fly_over_readiness": 11.173
+        }
+      },
+      "targeting": {
+        "strong_vs_weak_bias": 0.835,
+        "hybrid_kill_confirm_weight": 0.591,
+        "vulnerable_arc_bonus_weight": 1.635,
+        "thorns_caution_weight": 0.619,
+        "focus_fire_weight": 0.648
+      },
+      "lookahead": {
+        "lookahead_ply": 4,
+        "beam_width": 2,
+        "enemy_response_weight": 1.248,
+        "followup_discount": 0.663
+      },
+      "coordination": {
+        "activation_order_bias": 0.496,
+        "wounded_retreat_threshold": 0.373
+      }
+    }
+  ]
+}

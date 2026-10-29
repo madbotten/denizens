@@ -730,6 +730,7 @@ def test_bot_genome_serialization_and_rule_compliant_setup() -> None:
         `TEAM_ENEMY` (upper half) and `TEAM_PLAYER` (lower half) within budget.
     """
     import random
+    import random
     import bots
 
     rng = random.Random(2027)
@@ -783,6 +784,7 @@ def test_bot_2ply_lookahead_avoids_suicidal_lunge_and_records_telemetry() -> Non
         counter-turn response, sees the heavy counter-attack penalty in `DecisionTrace`,
         and avoids stepping into the Behemoth's 1-move kill zone.
     """
+    import random
     import bots
 
     rat_spec = rules.get_creature_spec(rules.CLASS_MAMMAL, 1)       # 1 move, HP 8
@@ -842,6 +844,111 @@ def test_bot_2ply_lookahead_avoids_suicidal_lunge_and_records_telemetry() -> Non
     assert any(
         c.enemy_response_penalty > 100.0 for c in bot2.decision_traces[0].top_candidates
     )
+
+
+def test_headless_skirmish_and_replay_log_instrumentation(tmp_path) -> None:
+    """
+    Phase 2 (Bot Evolution Plan):
+      - `run_paired_skirmish` runs North/South-swapped Mammal-vs-Mammal matches
+        completely UI-free and returns `BattleReplayLog` instances with initial setups,
+        turn logs, and `DecisionTrace` lookahead diagnostics.
+      - `BattleReplayLog` round-trips through `save_json` / `load_json` and formats
+        human-readable diagnostic output.
+    """
+    import random
+    import bots
+
+    champs = bots.create_default_champion_genomes()
+    champ_ctrl = bots.GeneticBotController(champs[0], record_telemetry=True)
+    classic_ctrl = bots.LegacyBotController()
+
+    log1, log2 = bots.run_paired_skirmish(
+        champ_ctrl,
+        classic_ctrl,
+        round_number=2,
+        budget=8,
+        max_turns=18,
+        seed=777,
+        record_log=True,
+    )
+
+    assert len(log1.initial_units) >= 2
+    assert len(log1.turn_logs) >= 1
+    assert log1.north_bot_id == champ_ctrl.bot_id
+    assert log2.south_bot_id == champ_ctrl.bot_id
+
+    log_file = tmp_path / "replay_test.json"
+    log1.save_json(str(log_file))
+    loaded = bots.BattleReplayLog.load_json(str(log_file))
+    assert loaded.match_id == log1.match_id
+    assert len(loaded.turn_logs) == len(log1.turn_logs)
+
+    report_txt = loaded.format_human_readable(max_turns=5)
+    assert "BATTLE REPLAY LOG" in report_txt
+    assert "INITIAL DEPLOYMENT:" in report_txt
+
+
+def test_bot_stable_persistence_and_evolution_loop(tmp_path) -> None:
+    """
+    Phase 2 (Bot Evolution Plan):
+      - `run_evolution` executes multi-generation tournaments, records ply-vs-ply
+        telemetry, injects random-gene bots, and persists top bots to `bot_stable.json`.
+      - Subsequent `run_evolution` calls load existing stable bots and increment
+        `total_generations_run`.
+    """
+    import random
+    import bots
+
+    stable_file = tmp_path / "test_stable.json"
+    log_dir = tmp_path / "logs"
+
+    stable1, telemetry1 = bots.run_evolution(
+        generations=1,
+        population_size=4,
+        random_injection_count=1,
+        stable_path=str(stable_file),
+        log_dir=str(log_dir),
+        record_upsets=True,
+        max_turns=12,
+        seed=1234,
+        verbose=False,
+    )
+    assert stable_file.exists()
+    assert stable1.total_generations_run == 1
+    assert len(stable1.bots) >= 4
+    assert "PLY-VS-PLY WIN RATE TELEMETRY" in telemetry1.format_summary()
+
+    # Resume evolution from the persisted stable
+    stable2, _ = bots.run_evolution(
+        generations=1,
+        population_size=4,
+        random_injection_count=1,
+        stable_path=str(stable_file),
+        log_dir=str(log_dir),
+        record_upsets=True,
+        max_turns=12,
+        seed=5678,
+        verbose=False,
+    )
+    assert stable2.total_generations_run == 2
+    top_bot = stable2.get_top_bot(0)
+    assert top_bot.games_vs_classic > 0
+    assert top_bot.championship_streak >= 1
+
+    # Verify deterministic gene-driven wave purchasing & champion gene dump
+    ctrl = bots.GeneticBotController(top_bot)
+    wave_a = [s.creature_id for s in ctrl.purchase_wave_specs(3, 14, rng=random.Random(1))]
+    wave_b = [s.creature_id for s in ctrl.purchase_wave_specs(3, 14, rng=random.Random(999))]
+    assert wave_a == wave_b
+
+    dump_txt = bots.format_genome_dump(top_bot)
+    assert "CHAMPION BOT GENE DUMP:" in dump_txt
+    assert "X-PLY LOOKAHEAD GENES:" in dump_txt
+    assert "ARMY SETUP & FORMATION GENES:" in dump_txt
+    assert "TARGETING & COORDINATION GENES:" in dump_txt
+    assert "SPECIES TACTICAL GENES" in dump_txt
+
+
 
 
 

@@ -1534,6 +1534,18 @@ def _score_ai_state(
     # Prefer melee adjacency (min_dist == 1)
     score = -abs(min_dist - 1) * 38.0 - min_dist * 4.0
 
+    # If at distance > 1, reward stepping onto a hex that has an unblocked closer neighbor
+    # so units behind an allied blocker step around to an open approach lane
+    if min_dist > 1:
+        has_open_step = any(
+            is_valid_hex(hex_neighbor(cand_hex, d)[0], hex_neighbor(cand_hex, d)[1], state.arena_radius)
+            and hex_distance(hex_neighbor(cand_hex, d), nearest_opp.hex_pos) < min_dist
+            and state.get_unit_at_hex(hex_neighbor(cand_hex, d), exclude_unit_id=unit.unit_id) is None
+            for d in range(6)
+        )
+        if has_open_step:
+            score += 15.0
+
     # Slight tie-break preference for empty hexes over occupied fly-over hexes at equal distance,
     # while still allowing flyers to cross occupied blockers to reduce distance to opposing units.
     if state.get_unit_at_hex(cand_hex, exclude_unit_id=unit.unit_id) is not None:
@@ -1552,21 +1564,21 @@ def _score_ai_state(
             hex_neighbor(cand_hex, d), nearest_opp.hex_pos  # type: ignore[arg-type]
         ),
     )
-    score -= hex_angle_distance(cand_facing, best_dir_to_nearest) * 8.0
+    score -= hex_angle_distance(cand_facing, best_dir_to_nearest) * 10.0
 
     # Flanking & defensive orientation around adjacent opposing units
     for ou in opp_units:
         if ou.hex_pos is None:
             continue
         if hex_distance(cand_hex, ou.hex_pos) == 1:
-            # Threatening an opposing unit's vulnerable flank/rear
-            inc_on_opp = hex_direction_between(cand_hex, ou.hex_pos)
+            # Incoming direction on `ou` when we attack `ou` (from `ou.hex_pos` to `cand_hex`)
+            inc_on_opp = hex_direction_between(ou.hex_pos, cand_hex)
             if inc_on_opp is not None:
                 rel_on_opp = relative_direction(ou.facing, inc_on_opp)
                 if rel_on_opp in ou.spec.vulnerable_arcs:
                     score += 14.0
-            # Avoid exposing our own vulnerable arcs to an adjacent opposing unit's attack arc
-            inc_on_us = hex_direction_between(ou.hex_pos, cand_hex)
+            # Incoming direction on us when `ou` attacks us (from `cand_hex` to `ou.hex_pos`)
+            inc_on_us = hex_direction_between(cand_hex, ou.hex_pos)
             if inc_on_us is not None:
                 rel_on_us = relative_direction(cand_facing, inc_on_us)
                 if rel_on_us in unit.spec.vulnerable_arcs:
