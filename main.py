@@ -4,8 +4,10 @@ Denizens — Application Entry Point & Main Pygame Event Loop.
 
 from __future__ import annotations
 
+import asyncio
 import math
 import os
+import random
 from typing import List, Optional, Tuple
 
 import pygame
@@ -742,8 +744,13 @@ class DenizensApp:
                 elif self.state.phase == C.PHASE_DEFEAT:
                     self.sounds.play_defeat()
 
-    def run(self) -> None:
+    async def run_async(self, max_frames: Optional[int] = None) -> None:
+        """
+        Asynchronous main event and render loop compatible with both desktop
+        Pygame and Pygbag WebAssembly (WASM).
+        """
         running = True
+        frames = 0
         while running:
             running = self.process_events()
             self.update_ai_turn()
@@ -760,14 +767,22 @@ class DenizensApp:
                 instructions_scroll_y=self.instructions_scroll_y,
             )
             pygame.display.flip()
+            await asyncio.sleep(0)
             self.clock.tick(60)
+            frames += 1
+            if max_frames is not None and frames >= max_frames:
+                break
         pygame.quit()
 
+    def run(self) -> None:
+        asyncio.run(self.run_async())
 
-def main() -> None:
+
+async def main() -> None:
+    random.seed(os.urandom(16))
     app = DenizensApp()
-    app.run()
+    await app.run_async()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

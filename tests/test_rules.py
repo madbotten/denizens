@@ -1271,3 +1271,40 @@ def test_denizens_app_audio_integration_ui_move_attack_and_victory_defeat() -> N
         pygame.quit()
 
 
+def test_pygbag_async_main_loop_and_wasm_entropy_seeding() -> None:
+    """
+    Phase 1 (Pygbag WebAssembly Deployment Plan):
+      - `main.main` and `DenizensApp.run_async` are coroutine functions yielding via
+        `await asyncio.sleep(0)` after `pygame.display.flip()`.
+      - `rules.default_rng()` creates `os.urandom(16)`-seeded RNG instances that
+        produce distinct random sequences across calls.
+      - `.gitignore` excludes `.venv/` and `build/`.
+    """
+    import asyncio
+    import inspect
+    import os
+    import main
+
+    assert inspect.iscoroutinefunction(main.main)
+    assert inspect.iscoroutinefunction(main.DenizensApp.run_async)
+
+    # Verify default_rng produces distinct random streams
+    rng1 = rules.default_rng()
+    rng2 = rules.default_rng()
+    seq1 = [rng1.randint(0, 10**9) for _ in range(8)]
+    seq2 = [rng2.randint(0, 10**9) for _ in range(8)]
+    assert seq1 != seq2
+
+    # Verify .gitignore contains .venv/ and build/
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    gitignore_path = os.path.join(project_root, ".gitignore")
+    with open(gitignore_path, "r", encoding="utf-8") as fh:
+        gitignore_text = fh.read()
+    assert ".venv/" in gitignore_text
+    assert "build/" in gitignore_text
+
+    # Verify 2 frames of DenizensApp.run_async complete cleanly
+    app = main.DenizensApp(mute_audio=True)
+    asyncio.run(app.run_async(max_frames=2))
+
+

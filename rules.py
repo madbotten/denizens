@@ -8,10 +8,23 @@ query legal actions (deployments, rotations, moves, attacks) and apply state tra
 
 from __future__ import annotations
 
+import os
 import random
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
+
+
+def default_rng() -> random.Random:
+    """
+    Create a fresh `random.Random` instance seeded from `os.urandom(16)` (falling back
+    to `random.getrandbits(128)`), ensuring full entropy in both desktop Python and
+    Pygbag WebAssembly (WASM) environments.
+    """
+    try:
+        return random.Random(os.urandom(16))
+    except Exception:
+        return random.Random(random.getrandbits(128))
 
 from constants import (
     ABS_FACING_NAMES,
@@ -554,7 +567,7 @@ def confirm_evolution_phase(
     if state.phase != PHASE_EVOLUTION:
         return False
     if rng is None:
-        rng = random.Random()
+        rng = default_rng()
 
     survivors = state.get_player_army_units()
     for idx, u in enumerate(survivors):
@@ -660,7 +673,7 @@ def purchase_enemy_wave(
       - ... up to Round 13: +Rajang (22 pts)
     """
     if rng is None:
-        rng = random.Random()
+        rng = default_rng()
 
     remaining = max(1, budget)
     purchased: List[CreatureSpec] = []
@@ -700,7 +713,7 @@ def spawn_enemy_wave_on_board(
     Mammal wave, and place the enemies in the upper half of the battlefield facing South.
     """
     if rng is None:
-        rng = random.Random()
+        rng = default_rng()
 
     # Clear existing enemy units
     to_remove = [uid for uid, u in state.units.items() if u.team == TEAM_ENEMY]
@@ -759,7 +772,7 @@ def grant_base_reinforcements(
     into open slots of the player's army (up to `state.max_army_size = 16`).
     """
     if rng is None:
-        rng = random.Random()
+        rng = default_rng()
 
     added: List[Unit] = []
     used_slots: Set[int] = {
@@ -808,7 +821,7 @@ def create_initial_game_state(
         upper half of the battlefield facing South.
     """
     if rng is None:
-        rng = random.Random()
+        rng = default_rng()
 
     state = GameState(
         arena_radius=ARENA_RADIUS,

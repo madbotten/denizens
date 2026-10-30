@@ -245,7 +245,7 @@ def create_random_genome(
 ) -> BotGenome:
     """Generate a randomized `BotGenome` for initial population seeding or diversity injection."""
     if rng is None:
-        rng = random.Random()
+        rng = rules.default_rng()
 
     purchase_weights = {
         spec.creature_id: round(rng.uniform(0.25, 2.75), 3) for spec in MAMMAL_LINEUP
@@ -376,7 +376,7 @@ class LegacyBotController:
     ) -> List[rules.Unit]:
         """Purchase and deploy a Mammal wave for `team` using the Classic algorithm."""
         if rng is None:
-            rng = random.Random()
+            rng = rules.default_rng()
 
         to_remove = [uid for uid, u in state.units.items() if u.team == team]
         for uid in to_remove:
@@ -485,7 +485,7 @@ class GeneticBotController:
         using `genome.setup.mammal_purchase_weights` and `genome.setup.elite_vs_swarm_bias`.
         """
         if rng is None:
-            rng = random.Random()
+            rng = rules.default_rng()
 
         setup = self.genome.setup
         remaining = max(1, budget)
@@ -546,7 +546,7 @@ class GeneticBotController:
         and `rules.deploy_team_unit_to_hex`.
         """
         if rng is None:
-            rng = random.Random()
+            rng = rules.default_rng()
 
         to_remove = [uid for uid, u in state.units.items() if u.team == team]
         for uid in to_remove:
