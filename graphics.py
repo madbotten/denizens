@@ -119,6 +119,13 @@ class CombatCallout:
 class BattleRenderer:
     """Renders the 2x8 Army Reserve Tray, 61-hex arena, unit sprites, and inspector."""
 
+    def _load_font(self, size: int, bold: bool = False) -> pygame.font.Font:
+        font_file = "Orbitron-Bold.ttf" if bold else "orbitron.ttf"
+        font_path = os.path.join(self.assets.base_dir, "fonts", font_file)
+        if os.path.isfile(font_path):
+            return pygame.font.Font(font_path, size)
+        return pygame.font.SysFont("georgia" if bold else "menlo", size, bold=bold)
+
     def __init__(
         self, screen: pygame.Surface, assets: AssetCache, camera: hexgrid.HexCamera
     ) -> None:
@@ -126,14 +133,14 @@ class BattleRenderer:
         self.assets = assets
         self.camera = camera
 
-        self.font_hero = pygame.font.SysFont("georgia", 54, bold=True)
-        self.font_title = pygame.font.SysFont("georgia", 24, bold=True)
-        self.font_splash_card = pygame.font.SysFont("georgia", 21, bold=True)
-        self.font_subtitle = pygame.font.SysFont("georgia", 17, bold=True)
-        self.font_body = pygame.font.SysFont("menlo", 14)
-        self.font_small = pygame.font.SysFont("menlo", 12)
-        self.font_tiny = pygame.font.SysFont("menlo", 11)
-        self.font_badge = pygame.font.SysFont("menlo", 13, bold=True)
+        self.font_hero = self._load_font(55, bold=True)
+        self.font_title = self._load_font(25, bold=True)
+        self.font_splash_card = self._load_font(21, bold=True)
+        self.font_subtitle = self._load_font(17, bold=True)
+        self.font_body = self._load_font(15, bold=False)
+        self.font_small = self._load_font(13, bold=False)
+        self.font_tiny = self._load_font(12, bold=False)
+        self.font_badge = self._load_font(14, bold=True)
 
         self.buttons: List[UIButton] = []
         self.callouts: List[CombatCallout] = []
@@ -546,6 +553,10 @@ class BattleRenderer:
             ctitle = self.font_splash_card.render(
                 cfg["title"], True, cfg["title_col"]
             )
+            if ctitle.get_width() > crect.width - 24:
+                ctitle = self.font_subtitle.render(
+                    cfg["title"], True, cfg["title_col"]
+                )
             self.screen.blit(
                 ctitle,
                 (crect.centerx - ctitle.get_width() * 0.5, crect.y + 20),
@@ -554,6 +565,14 @@ class BattleRenderer:
             csub = self.font_subtitle.render(
                 cfg["subtitle"], True, C.COLOR_TEXT_GOLD
             )
+            if csub.get_width() > crect.width - 24:
+                csub = self.font_badge.render(
+                    cfg["subtitle"], True, C.COLOR_TEXT_GOLD
+                )
+            if csub.get_width() > crect.width - 24:
+                csub = self.font_small.render(
+                    cfg["subtitle"], True, C.COLOR_TEXT_GOLD
+                )
             self.screen.blit(
                 csub,
                 (crect.centerx - csub.get_width() * 0.5, crect.y + 54),
@@ -573,6 +592,8 @@ class BattleRenderer:
                 bsurf = self.font_body.render(b_line, True, C.COLOR_TEXT_MAIN)
                 if bsurf.get_width() > max_b_w:
                     bsurf = self.font_small.render(b_line, True, C.COLOR_TEXT_MAIN)
+                if bsurf.get_width() > max_b_w:
+                    bsurf = self.font_tiny.render(b_line, True, C.COLOR_TEXT_MAIN)
                 self.screen.blit(bsurf, (crect.x + 20, by))
                 by += 34
 
@@ -1674,6 +1695,8 @@ class BattleRenderer:
             surf = self.font_body.render(text, True, col)
             if surf.get_width() > max_line_w:
                 surf = self.font_small.render(text, True, col)
+            if surf.get_width() > max_line_w:
+                surf = self.font_tiny.render(text, True, col)
             self.screen.blit(surf, (x0 + 12, cy_line))
             cy_line += 28
         y += 138
@@ -1723,6 +1746,8 @@ class BattleRenderer:
         cy_line = y + 10
         for text, col in attr_lines:
             surf = self.font_small.render(text, True, col)
+            if surf.get_width() > max_line_w:
+                surf = self.font_tiny.render(text, True, col)
             self.screen.blit(surf, (x0 + 12, cy_line))
             cy_line += 26
         y += 208
@@ -1871,6 +1896,10 @@ class BattleRenderer:
             pygame.draw.rect(self.screen, bg, btn.rect, border_radius=6)
             pygame.draw.rect(self.screen, border, btn.rect, width=2, border_radius=6)
             lbl = self.font_badge.render(btn.label, True, fg)
+            if lbl.get_width() > btn.rect.width - 12:
+                lbl = self.font_small.render(btn.label, True, fg)
+            if lbl.get_width() > btn.rect.width - 12:
+                lbl = self.font_tiny.render(btn.label, True, fg)
             self.screen.blit(
                 lbl,
                 (

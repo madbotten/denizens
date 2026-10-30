@@ -1295,13 +1295,15 @@ def test_pygbag_async_main_loop_and_wasm_entropy_seeding() -> None:
     seq2 = [rng2.randint(0, 10**9) for _ in range(8)]
     assert seq1 != seq2
 
-    # Verify .gitignore contains .venv/ and build/
+    # Verify .gitignore contains .venv/ and build/, and bundled Orbitron fonts exist
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     gitignore_path = os.path.join(project_root, ".gitignore")
     with open(gitignore_path, "r", encoding="utf-8") as fh:
         gitignore_text = fh.read()
     assert ".venv/" in gitignore_text
     assert "build/" in gitignore_text
+    assert os.path.isfile(os.path.join(project_root, "fonts", "orbitron.ttf"))
+    assert os.path.isfile(os.path.join(project_root, "fonts", "Orbitron-Bold.ttf"))
 
     # Verify 2 frames of DenizensApp.run_async complete cleanly
     app = main.DenizensApp(mute_audio=True)

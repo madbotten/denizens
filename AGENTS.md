@@ -67,3 +67,27 @@ When designing and implementing game logic for **Denizens**, ensure that the sha
   - **Mammal Attacks (`assets/sounds/mammalattacks/`)**: `baboon.ogg`, `deepsnarl.ogg`, `eagle.ogg`, `growl.ogg`, `hound.ogg`, `rat.ogg`, `roar.ogg`
 - **Asset Processing Tool**:
   - `tools/make_transparent.m` — Native macOS CoreGraphics/ImageIO utility for extracting transparent RGBA top-down sprites from `#181a1f` slate backgrounds and compositing the master gothic portrait frame (`--composite-frame`).
+
+---
+
+## Pygbag WebAssembly (WASM) Build & Deployment
+
+`main.py` uses an `async def main()` loop (`DenizensApp.run_async`) with `await asyncio.sleep(0)` after `pygame.display.flip()` and seeds `random` from `os.urandom(16)` (`rules.default_rng()`), making the game ready to run in-browser via **Pygbag**.
+
+1. **One-Time SSL Certificate Setup (macOS Terminal session)**:
+   ```bash
+   pip install pygbag certifi --user
+   export SSL_CERT_FILE=$(python3 -c "import certifi; print(certifi.where())")
+   ```
+2. **Build & Run Local Browser Dev Server (`http://localhost:8000`)**:
+   Run from the parent directory (`/Users/madbot/PygameProjects`):
+   ```bash
+   cd /Users/madbot/PygameProjects
+   python3 -m pygbag --disable-sound-format-error Denizens
+   ```
+3. **Production Web Build Only (no dev server)**:
+   ```bash
+   cd /Users/madbot/PygameProjects
+   python3 -m pygbag --disable-sound-format-error --build Denizens
+   ```
+   Output files are written to `/Users/madbot/PygameProjects/Denizens/build/web/`.
