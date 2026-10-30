@@ -1062,11 +1062,92 @@ def test_mammal_round_by_round_unlock_progression() -> None:
     assert all(s.unlock_round <= 3 and s.name in ("Rat", "Wolf", "Bear") for s in evolved_r3)
 
 
+def test_all_sound_ogg_assets_and_creature_sound_mappings() -> None:
+    """
+    Phase 1 (Sound Integration Plan):
+      - All 23 sound files under `assets/sounds/` exist as non-empty `.ogg` files,
+        and no `.mp3` files remain.
+      - Every `CreatureSpec` (37 total across Serpent, Lizard, Turtle, Mammal) maps
+        to an existing `.ogg` move sound and attack sound.
+      - All flying creatures (`spec.can_fly`) use `move_sound == "flight"`.
+      - `SoundManager` preloads all 23 `.ogg` files and triggers UI, move, and
+        attack sounds cleanly.
+    """
+    import os
+    import sounds
+    from creatures import ALL_CREATURES
 
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sounds_root = os.path.join(project_root, "assets", "sounds")
+    assert os.path.isdir(sounds_root), f"Missing sounds directory: {sounds_root}"
 
+    # 1. Verify no .mp3 files remain and collect all .ogg files on disk
+    mp3_files = []
+    ogg_files = set()
+    for root, _dirs, files in os.walk(sounds_root):
+        for fname in files:
+            full_p = os.path.join(root, fname)
+            rel_p = os.path.relpath(full_p, project_root).replace("\\", "/")
+            if fname.lower().endswith(".mp3"):
+                mp3_files.append(rel_p)
+            elif fname.lower().endswith(".ogg"):
+                assert os.path.getsize(full_p) > 0, f"Empty .ogg file: {rel_p}"
+                ogg_files.add(rel_p)
 
+    assert mp3_files == [], f"Found leftover .mp3 files: {mp3_files}"
+    assert len(ogg_files) == 23, f"Expected 23 .ogg files, found {len(ogg_files)}: {sorted(ogg_files)}"
 
+    # 2. Verify all 4 UI sounds exist
+    for ui_rel in sounds.ALL_UI_SOUND_PATHS:
+        ui_full = os.path.join(project_root, ui_rel)
+        assert os.path.isfile(ui_full), f"Missing UI sound: {ui_rel}"
+        assert os.path.getsize(ui_full) > 0
 
+    # 3. Verify all 37 CreatureSpec sound mappings and confirm every move/attack .ogg is used
+    used_move_sounds = set()
+    used_attack_sounds = set()
+    assert len(ALL_CREATURES) == 37
 
+    for spec in ALL_CREATURES:
+        move_rel = spec.move_sound_path
+        atk_rel = spec.attack_sound_path
+        assert move_rel.startswith("assets/sounds/moves/") and move_rel.endswith(".ogg")
+        if spec.is_enemy:
+            assert atk_rel.startswith("assets/sounds/mammalattacks/") and atk_rel.endswith(".ogg")
+        else:
+            assert atk_rel.startswith("assets/sounds/reptileattacks/") and atk_rel.endswith(".ogg")
 
+        if spec.can_fly:
+            assert spec.move_sound == "flight", f"Flying creature {spec.name} should use 'flight' move sound"
+
+        move_full = os.path.join(project_root, move_rel)
+        atk_full = os.path.join(project_root, atk_rel)
+        assert os.path.isfile(move_full), f"Missing move sound for {spec.name}: {move_rel}"
+        assert os.path.isfile(atk_full), f"Missing attack sound for {spec.name}: {atk_rel}"
+        used_move_sounds.add(move_rel)
+        used_attack_sounds.add(atk_rel)
+
+    # All 4 move sounds, all 8 reptile attack sounds, and all 7 mammal attack sounds are utilized
+    assert len(used_move_sounds) == 4
+    assert len(used_attack_sounds) == 15
+
+    # 4. Verify SoundManager preload and playback methods
+    mgr = sounds.SoundManager(project_root, enabled=True)
+    verified_count = mgr.preload_all()
+    assert verified_count == 23
+
+    assert mgr.play_ui_positive()
+    assert mgr.last_played_path == sounds.UI_POSITIVE_PATH
+    assert mgr.play_ui_negative()
+    assert mgr.last_played_path == sounds.UI_NEGATIVE_PATH
+    assert mgr.play_victory()
+    assert mgr.last_played_path == sounds.UI_VICTORY_PATH
+    assert mgr.play_defeat()
+    assert mgr.last_played_path == sounds.UI_DEFEAT_PATH
+
+    for spec in ALL_CREATURES:
+        assert mgr.play_move(spec)
+        assert mgr.last_played_path == spec.move_sound_path
+        assert mgr.play_attack(spec)
+        assert mgr.last_played_path == spec.attack_sound_path
 

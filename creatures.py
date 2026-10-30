@@ -86,6 +86,8 @@ class CreatureSpec:
     vulnerable_arcs: FrozenSet[int] = DEFAULT_VULNERABLE_ARCS
     special_powers: Tuple[str, ...] = ()
     unlock_round: int = 1
+    move_sound: str = "softmove"
+    attack_sound: str = "snap"
 
     @property
     def topdown_path(self) -> str:
@@ -94,6 +96,19 @@ class CreatureSpec:
     @property
     def portrait_path(self) -> str:
         return f"assets/monsters/{self.creature_class}/portraits/{self.asset_slug}.png"
+
+    @property
+    def is_enemy(self) -> bool:
+        return self.creature_class == CLASS_MAMMAL
+
+    @property
+    def move_sound_path(self) -> str:
+        return f"assets/sounds/moves/{self.move_sound}.ogg"
+
+    @property
+    def attack_sound_path(self) -> str:
+        folder = "mammalattacks" if self.is_enemy else "reptileattacks"
+        return f"assets/sounds/{folder}/{self.attack_sound}.ogg"
 
 
 SERPENT_LINEUP: Tuple[CreatureSpec, ...] = (
@@ -112,6 +127,8 @@ SERPENT_LINEUP: Tuple[CreatureSpec, ...] = (
         max_hp=8,
         attack=5,
         defense=1,
+        move_sound="softmove",
+        attack_sound="hiss",
     ),
     CreatureSpec(
         creature_id="serpent_02_viper",
@@ -129,6 +146,8 @@ SERPENT_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=6,
         defense=1,
         special_powers=("venom_fangs",),
+        move_sound="softmove",
+        attack_sound="hiss",
     ),
     CreatureSpec(
         creature_id="serpent_03_serpent",
@@ -146,6 +165,8 @@ SERPENT_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=8,
         defense=2,
         special_powers=("constrict",),
+        move_sound="softmove",
+        attack_sound="snap",
     ),
     CreatureSpec(
         creature_id="serpent_04_jaculus",
@@ -163,6 +184,8 @@ SERPENT_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=10,
         defense=2,
         special_powers=("winged_javelin",),
+        move_sound="flight",
+        attack_sound="pecking",
     ),
     CreatureSpec(
         creature_id="serpent_05_amphisbaena",
@@ -182,6 +205,8 @@ SERPENT_LINEUP: Tuple[CreatureSpec, ...] = (
         attack_arcs=DIRS_FORWARD_REAR,
         vulnerable_arcs=frozenset({FLANK_LEFT, FLANK_RIGHT}),
         special_powers=("twin_heads",),
+        move_sound="softmove",
+        attack_sound="snap",
     ),
     CreatureSpec(
         creature_id="serpent_06_wyrm",
@@ -199,6 +224,8 @@ SERPENT_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=13,
         defense=4,
         special_powers=("draconic_sweep",),
+        move_sound="flight",
+        attack_sound="dragon",
     ),
     CreatureSpec(
         creature_id="serpent_07_basilisk",
@@ -216,6 +243,8 @@ SERPENT_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=15,
         defense=5,
         special_powers=("petrifying_gaze", "lethal_venom"),
+        move_sound="softmove",
+        attack_sound="crunch",
     ),
     CreatureSpec(
         creature_id="serpent_08_hydra",
@@ -234,6 +263,8 @@ SERPENT_LINEUP: Tuple[CreatureSpec, ...] = (
         defense=6,
         attack_arcs=DIRS_FRONT_ARC,
         special_powers=("multi_headed_strike", "regeneration"),
+        move_sound="largestomp",
+        attack_sound="dragon",
     ),
 )
 
@@ -255,6 +286,8 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         max_hp=9,
         attack=3,
         defense=2,
+        move_sound="softmove",
+        attack_sound="lizard",
     ),
     CreatureSpec(
         creature_id="lizard_02_horned",
@@ -273,6 +306,8 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=4,
         defense=3,
         special_powers=("thorny_hide",),
+        move_sound="softmove",
+        attack_sound="lizard",
     ),
     CreatureSpec(
         creature_id="lizard_03_monitor",
@@ -291,6 +326,8 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=6,
         defense=3,
         special_powers=("predator_sprint",),
+        move_sound="footsteps",
+        attack_sound="lizard",
     ),
     CreatureSpec(
         creature_id="lizard_04_komodo",
@@ -309,6 +346,8 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=8,
         defense=4,
         special_powers=("serrated_bite",),
+        move_sound="footsteps",
+        attack_sound="crunch",
     ),
     CreatureSpec(
         creature_id="lizard_05_wyrmling",
@@ -327,6 +366,8 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=9,
         defense=4,
         special_powers=("fledgling_flight",),
+        move_sound="flight",
+        attack_sound="snap",
     ),
     CreatureSpec(
         creature_id="lizard_06_drake",
@@ -345,6 +386,8 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=11,
         defense=5,
         special_powers=("wing_gust",),
+        move_sound="flight",
+        attack_sound="dragon",
     ),
     CreatureSpec(
         creature_id="lizard_07_young_dragon",
@@ -364,6 +407,8 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         defense=6,
         attack_arcs=DIRS_FRONT_ARC,
         special_powers=("fire_breath",),
+        move_sound="flight",
+        attack_sound="dragon",
     ),
     CreatureSpec(
         creature_id="lizard_08_tian_long",
@@ -383,6 +428,8 @@ LIZARD_LINEUP: Tuple[CreatureSpec, ...] = (
         defense=7,
         attack_arcs=DIRS_FRONT_ARC,
         special_powers=("celestial_flight", "tempest_fury"),
+        move_sound="flight",
+        attack_sound="dragon",
     ),
 )
 
@@ -403,6 +450,8 @@ TURTLE_LINEUP: Tuple[CreatureSpec, ...] = (
         max_hp=12,
         attack=3,
         defense=4,
+        move_sound="softmove",
+        attack_sound="snap",
     ),
     CreatureSpec(
         creature_id="turtle_02_box_turtle",
@@ -420,6 +469,8 @@ TURTLE_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=4,
         defense=5,
         special_powers=("hinged_shell",),
+        move_sound="softmove",
+        attack_sound="snap",
     ),
     CreatureSpec(
         creature_id="turtle_03_snapper",
@@ -437,6 +488,8 @@ TURTLE_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=6,
         defense=6,
         special_powers=("snapping_jaws",),
+        move_sound="footsteps",
+        attack_sound="snapper",
     ),
     CreatureSpec(
         creature_id="turtle_04_tortoise",
@@ -455,6 +508,8 @@ TURTLE_LINEUP: Tuple[CreatureSpec, ...] = (
         defense=7,
         vulnerable_arcs=frozenset({REAR}),
         special_powers=("fortress_carapace",),
+        move_sound="footsteps",
+        attack_sound="crunch",
     ),
     CreatureSpec(
         creature_id="turtle_05_giant_snapper",
@@ -473,6 +528,8 @@ TURTLE_LINEUP: Tuple[CreatureSpec, ...] = (
         defense=8,
         vulnerable_arcs=frozenset({REAR}),
         special_powers=("crushing_bite",),
+        move_sound="largestomp",
+        attack_sound="snapper",
     ),
     CreatureSpec(
         creature_id="turtle_06_alligator_snapper",
@@ -491,6 +548,8 @@ TURTLE_LINEUP: Tuple[CreatureSpec, ...] = (
         defense=9,
         vulnerable_arcs=frozenset({REAR}),
         special_powers=("spiked_ridge",),
+        move_sound="largestomp",
+        attack_sound="snapper",
     ),
     CreatureSpec(
         creature_id="turtle_07_war_turtle",
@@ -509,6 +568,8 @@ TURTLE_LINEUP: Tuple[CreatureSpec, ...] = (
         defense=10,
         vulnerable_arcs=frozenset(),
         special_powers=("ironclad_bastion",),
+        move_sound="largestomp",
+        attack_sound="crunch",
     ),
     CreatureSpec(
         creature_id="turtle_08_dragon_turtle",
@@ -528,6 +589,8 @@ TURTLE_LINEUP: Tuple[CreatureSpec, ...] = (
         attack_arcs=DIRS_FRONT_ARC,
         vulnerable_arcs=frozenset(),
         special_powers=("molten_carapace", "steam_breath"),
+        move_sound="largestomp",
+        attack_sound="dragtort",
     ),
 )
 
@@ -549,6 +612,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         max_hp=8,
         attack=4,
         defense=1,
+        move_sound="softmove",
+        attack_sound="rat",
     ),
     CreatureSpec(
         creature_id="mammal_02_wolf",
@@ -567,6 +632,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=5,
         defense=2,
         special_powers=("pack_tactics",),
+        move_sound="footsteps",
+        attack_sound="growl",
     ),
     CreatureSpec(
         creature_id="mammal_03_bear",
@@ -585,6 +652,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=7,
         defense=4,
         special_powers=("maul",),
+        move_sound="largestomp",
+        attack_sound="deepsnarl",
     ),
     CreatureSpec(
         creature_id="mammal_04_lion",
@@ -603,6 +672,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=8,
         defense=3,
         special_powers=("pounce",),
+        move_sound="footsteps",
+        attack_sound="roar",
     ),
     CreatureSpec(
         creature_id="mammal_05_griffon",
@@ -621,6 +692,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=10,
         defense=4,
         special_powers=("diving_talons",),
+        move_sound="flight",
+        attack_sound="eagle",
     ),
     CreatureSpec(
         creature_id="mammal_06_owlbear",
@@ -639,6 +712,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=11,
         defense=5,
         special_powers=("ferocious_hug",),
+        move_sound="largestomp",
+        attack_sound="deepsnarl",
     ),
     CreatureSpec(
         creature_id="mammal_07_behemoth",
@@ -657,6 +732,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=13,
         defense=7,
         special_powers=("gore_charge",),
+        move_sound="largestomp",
+        attack_sound="roar",
     ),
     CreatureSpec(
         creature_id="mammal_08_displacer_beast",
@@ -676,6 +753,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         defense=5,
         attack_arcs=DIRS_FRONT_ARC,
         special_powers=("displacement", "tentacle_lash"),
+        move_sound="footsteps",
+        attack_sound="growl",
     ),
     CreatureSpec(
         creature_id="mammal_09_manticore",
@@ -694,6 +773,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=13,
         defense=5,
         special_powers=("tail_spikes",),
+        move_sound="flight",
+        attack_sound="roar",
     ),
     CreatureSpec(
         creature_id="mammal_10_rajang",
@@ -712,6 +793,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=16,
         defense=6,
         special_powers=("thunder_rage",),
+        move_sound="largestomp",
+        attack_sound="baboon",
     ),
     CreatureSpec(
         creature_id="mammal_11_dire_wolf",
@@ -730,6 +813,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=13,
         defense=5,
         special_powers=("alpha_howl",),
+        move_sound="footsteps",
+        attack_sound="hound",
     ),
     CreatureSpec(
         creature_id="mammal_12_sabertooth",
@@ -748,6 +833,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         attack=15,
         defense=5,
         special_powers=("rending_fangs",),
+        move_sound="footsteps",
+        attack_sound="deepsnarl",
     ),
     CreatureSpec(
         creature_id="mammal_13_hell_hound",
@@ -767,6 +854,8 @@ MAMMAL_LINEUP: Tuple[CreatureSpec, ...] = (
         defense=6,
         attack_arcs=DIRS_FRONT_ARC,
         special_powers=("hellfire_breath",),
+        move_sound="footsteps",
+        attack_sound="hound",
     ),
 )
 
@@ -782,6 +871,8 @@ CREATURE_BY_ID: Dict[str, CreatureSpec] = {
     for lineup in CLASS_LINEUPS.values()
     for spec in lineup
 }
+
+ALL_CREATURES: Tuple[CreatureSpec, ...] = tuple(CREATURE_BY_ID.values())
 
 
 def get_creature_spec(creature_class: str, stage: int) -> CreatureSpec:
