@@ -11,15 +11,17 @@ from typing import List, Optional, Tuple
 import pygame
 
 import constants as C
+import creatures
 import graphics
 import hexgrid
 import rules
+import sounds
 
 
 class DenizensApp:
     """Initializes Pygame subsystems and runs the main event and render loop."""
 
-    def __init__(self) -> None:
+    def __init__(self, mute_audio: bool = False) -> None:
         pygame.init()
         pygame.display.set_caption("Denizens — Tactical Hex Battle")
         self.screen = pygame.display.set_mode((C.SCREEN_WIDTH, C.SCREEN_HEIGHT))
@@ -27,6 +29,8 @@ class DenizensApp:
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
         self.assets = graphics.AssetCache(base_dir)
+        self.sounds = sounds.SoundManager(base_dir, enabled=True, mute=mute_audio)
+        self.sounds.preload_all()
         self.camera = hexgrid.HexCamera(
             C.MAP_VIEWPORT_WIDTH, C.SCREEN_HEIGHT, viewport_x=C.MAP_VIEWPORT_X
         )
@@ -58,7 +62,22 @@ class DenizensApp:
             "Welcome to Denizens! Choose View Instructions [I], Play Basic [1 / B / Enter], Play Intermediate [2 / M], or Play Advanced [3 / A]."
         )
 
+    def _resolve_attacker_spec(
+        self, attacker_id: str
+    ) -> Optional[creatures.CreatureSpec]:
+        if self.state.phase == C.PHASE_EVOLUTION:
+            for rec in self.state.evolution_records:
+                if rec.unit_id == attacker_id:
+                    return rec.old_spec
+        unit = self.state.get_unit(attacker_id)
+        return unit.spec if unit is not None else None
+
     def _report_attack_results(self, results: List[rules.AttackResult]) -> None:
+        if results:
+            atk_spec = self._resolve_attacker_spec(results[0].attacker_id)
+            if atk_spec is not None:
+                self.sounds.play_attack(atk_spec)
+
         self.renderer.add_attack_callouts(results)
         parts: List[str] = []
         for res in results:
@@ -70,12 +89,14 @@ class DenizensApp:
             )
         summary = "  |  ".join(parts)
         if self.state.phase == C.PHASE_EVOLUTION:
+            self.sounds.play_victory()
             leveled_cnt = sum(1 for r in self.state.evolution_records if r.leveled_up)
             summary += (
                 f"   *** VICTORY! Entering Evolution Phase ({len(self.state.evolution_records)} survivors, "
                 f"{leveled_cnt} evolved) — Press Enter or click Confirm Evolution! ***"
             )
         elif self.state.phase == C.PHASE_DEFEAT:
+            self.sounds.play_defeat()
             summary += "   *** DEFEAT! All of your reptiles have been slain! Press Enter or N for a New Campaign. ***"
         elif rules.are_all_enemies_slain(self.state):
             summary += "   *** VICTORY! All Enemy Mammals Slain! ***"
@@ -91,74 +112,99 @@ class DenizensApp:
         sel_id = self.state.selected_unit_id
         if action_id == "view_instructions":
             if rules.open_instructions(self.state):
+                self.sounds.play_ui_positive()
                 self.instructions_scroll_y = 0
                 self.status_message = (
                     "Viewing Denizens Instructions & Evolution Compendium (denizens.txt). "
                     "Use Mouse Wheel or Up/Down/PgUp/PgDn to scroll; press Esc or Enter to return."
                 )
+            else:
+                self.sounds.play_ui_negative()
 
         elif action_id == "close_instructions":
             if rules.close_instructions(self.state):
+                self.sounds.play_ui_positive()
                 self.status_message = (
                     "Welcome to Denizens! Choose View Instructions [I], Play Basic [1 / B / Enter], Play Intermediate [2 / M], or Play Advanced [3 / A]."
                 )
+            else:
+                self.sounds.play_ui_negative()
 
         elif action_id == "play_basic":
             if rules.start_campaign(self.state, C.GAME_MODE_BASIC):
+                self.sounds.play_ui_positive()
                 self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
                 self.status_message = (
                     "Play Basic (Classic Bot • Adaptive Waves) — Round 1 Setup: Drag all 6 reptiles onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
                 )
+            else:
+                self.sounds.play_ui_negative()
 
         elif action_id == "play_intermediate":
             if rules.start_campaign(self.state, C.GAME_MODE_INTERMEDIATE):
+                self.sounds.play_ui_positive()
                 self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
                 self.status_message = (
                     "Play Intermediate (Classic Bot • Fixed Curve) — Round 1 Setup: Drag all 6 reptiles onto the lower half of the battlefield, then click Confirm Deployment [Enter]."
                 )
+            else:
+                self.sounds.play_ui_negative()
 
         elif action_id == "play_advanced":
             if rules.start_campaign(self.state, C.GAME_MODE_ADVANCED):
+                self.sounds.play_ui_positive()
                 self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
                 self.status_message = (
                     f"Play Advanced (Evolved Bot: {self.state.active_bot_name} [{self.state.active_bot_ply}-Ply] • Fixed Curve) — Round 1 Setup: Drag all 6 reptiles onto the lower half!"
                 )
+            else:
+                self.sounds.play_ui_negative()
 
         elif action_id == "return_to_splash":
             if rules.return_to_splash(self.state):
+                self.sounds.play_ui_positive()
                 self.status_message = (
                     "Returned to Title Screen. Choose View Instructions [I], Play Basic [1 / B / Enter], Play Intermediate [2 / M], or Play Advanced [3 / A]."
                 )
+            else:
+                self.sounds.play_ui_negative()
 
-        elif action_id == "rotate_ccw" and sel_id:
-            if rules.rotate_unit_by_step(self.state, sel_id, -1):
+        elif action_id == "rotate_ccw":
+            if sel_id and rules.rotate_unit_by_step(self.state, sel_id, -1):
+                self.sounds.play_ui_positive()
                 u = self.state.get_unit(sel_id)
                 if u:
                     self.status_message = (
                         f"{u.spec.name} rotated CCW to {C.ABS_FACING_NAMES[u.facing]} ({u.juncture})."
                     )
             else:
+                self.sounds.play_ui_negative()
                 self.status_message = "Rotation CCW not legal right now (unit must be deployed and within rotation limit)."
 
-        elif action_id == "rotate_cw" and sel_id:
-            if rules.rotate_unit_by_step(self.state, sel_id, +1):
+        elif action_id == "rotate_cw":
+            if sel_id and rules.rotate_unit_by_step(self.state, sel_id, +1):
+                self.sounds.play_ui_positive()
                 u = self.state.get_unit(sel_id)
                 if u:
                     self.status_message = (
                         f"{u.spec.name} rotated CW to {C.ABS_FACING_NAMES[u.facing]} ({u.juncture})."
                     )
             else:
+                self.sounds.play_ui_negative()
                 self.status_message = "Rotation CW not legal right now (unit must be deployed and within rotation limit)."
 
-        elif action_id == "undeploy_unit" and sel_id:
-            u = self.state.get_unit(sel_id)
-            if u and rules.undeploy_unit_to_reserve(self.state, sel_id):
+        elif action_id == "undeploy_unit":
+            u = self.state.get_unit(sel_id) if sel_id else None
+            if u and sel_id and rules.undeploy_unit_to_reserve(self.state, sel_id):
+                self.sounds.play_ui_positive()
                 self.status_message = f"Returned {u.spec.name} to the Army Reserve Tray."
             else:
+                self.sounds.play_ui_negative()
                 self.status_message = "Cannot return unit to reserve (only deployed player units during Setup Phase)."
 
         elif action_id == "confirm_deployment":
             if rules.confirm_deployment(self.state):
+                self.sounds.play_ui_positive()
                 self.camera.set_viewport(0, C.SIDEBAR_X)
                 deployed_cnt = sum(
                     1 for u in self.state.get_player_army_units() if u.is_deployed
@@ -168,6 +214,7 @@ class DenizensApp:
                     f"Turn 1 — Active Team: {self.state.active_team.upper()}."
                 )
             else:
+                self.sounds.play_ui_negative()
                 unplaced_cnt = sum(
                     1 for u in self.state.get_player_army_units() if u.in_reserve
                 )
@@ -175,20 +222,27 @@ class DenizensApp:
                     f"All reptiles in your army must be deployed before confirming! ({unplaced_cnt} still in Reserve)"
                 )
 
-        elif action_id == "juncture_attack" and sel_id:
-            results = rules.execute_attack(self.state, sel_id)
+        elif action_id == "juncture_attack":
+            results = rules.execute_attack(self.state, sel_id) if sel_id else []
             if results:
                 self._report_attack_results(results)
             else:
+                self.sounds.play_ui_negative()
                 self.status_message = (
                     "Cannot attack right now (need an enemy in attack arc and an available attack at this juncture)."
                 )
 
         elif action_id == "end_turn":
-            if self.state.active_team != C.TEAM_PLAYER:
+            if (
+                self.state.phase != C.PHASE_BATTLE
+                or self.state.active_team != C.TEAM_PLAYER
+            ):
+                self.sounds.play_ui_negative()
                 return
             if rules.end_turn(self.state):
+                self.sounds.play_ui_positive()
                 if self.state.phase == C.PHASE_EVOLUTION:
+                    self.sounds.play_victory()
                     leveled_cnt = sum(
                         1 for r in self.state.evolution_records if r.leveled_up
                     )
@@ -197,6 +251,7 @@ class DenizensApp:
                         f"({leveled_cnt} evolved). Press Enter or click Confirm Evolution."
                     )
                 elif self.state.phase == C.PHASE_DEFEAT:
+                    self.sounds.play_defeat()
                     self.status_message = (
                         "Defeat! All of your reptiles have fallen. Press Enter or N to start a new campaign."
                     )
@@ -216,9 +271,11 @@ class DenizensApp:
                         f"({enemies_left} enemy mammals remaining)"
                     )
             else:
+                self.sounds.play_ui_negative()
                 self.status_message = "Cannot end turn while a flying creature is overlapping another unit!"
 
         elif action_id == "new_game":
+            self.sounds.play_ui_positive()
             self.state = rules.create_initial_game_state(
                 game_mode=self.state.game_mode
             )
@@ -229,6 +286,7 @@ class DenizensApp:
 
         elif action_id == "confirm_evolution":
             if rules.confirm_evolution_phase(self.state):
+                self.sounds.play_ui_positive()
                 self.camera.set_viewport(C.MAP_VIEWPORT_X, C.MAP_VIEWPORT_WIDTH)
                 army_cnt = len(self.state.get_player_army_units())
                 enemy_cnt = sum(
@@ -242,9 +300,11 @@ class DenizensApp:
                     f"{enemy_cnt} Enemy Mammals ({self.state.wave_budget} pts). Drag all reptiles onto the lower half!"
                 )
             else:
+                self.sounds.play_ui_negative()
                 self.status_message = "Confirm Evolution is only available during the Evolution Phase."
 
         elif action_id == "reset_camera":
+            self.sounds.play_ui_positive()
             self.camera.reset()
             self.status_message = "Camera view reset to center."
 
@@ -254,8 +314,10 @@ class DenizensApp:
             return
         unit = self.state.get_unit_by_reserve_slot(slot_idx)
         if unit is None or not unit.in_reserve:
+            self.sounds.play_ui_negative()
             return
 
+        self.sounds.play_ui_positive()
         self.state.selected_unit_id = unit.unit_id
         self.status_message = (
             f"Selected {unit.spec.name} (Stage {unit.spec.stage}, {unit.spec.point_cost} pts) in Reserve."
@@ -269,12 +331,14 @@ class DenizensApp:
     def handle_map_left_down(self, screen_pos: Tuple[int, int]) -> None:
         clicked_hex = self.camera.pixel_to_hex(screen_pos[0], screen_pos[1])
         if not hexgrid.is_valid_hex(clicked_hex[0], clicked_hex[1], self.state.arena_radius):
+            self.sounds.play_ui_negative()
             return
 
         if self.state.phase == C.PHASE_SETUP:
             units_here = self.state.get_units_at_hex(clicked_hex)
             if units_here:
                 chosen = units_here[-1]
+                self.sounds.play_ui_positive()
                 self.state.selected_unit_id = chosen.unit_id
                 self.status_message = (
                     f"Selected {chosen.spec.name} ({chosen.team.upper()}) at {clicked_hex}."
@@ -291,12 +355,22 @@ class DenizensApp:
                 sel_unit is not None
                 and sel_unit.team == C.TEAM_PLAYER
                 and sel_unit.in_reserve
-                and rules.is_valid_player_deploy_hex(self.state, clicked_hex)
             ):
-                if rules.deploy_unit_to_hex(self.state, sel_unit.unit_id, clicked_hex):
+                if (
+                    rules.is_valid_player_deploy_hex(self.state, clicked_hex)
+                    and rules.deploy_unit_to_hex(self.state, sel_unit.unit_id, clicked_hex)
+                ):
+                    self.sounds.play_ui_positive()
                     self.status_message = (
                         f"Deployed {sel_unit.spec.name} to {clicked_hex}."
                     )
+                else:
+                    self.sounds.play_ui_negative()
+                    self.status_message = (
+                        "Invalid deployment hex! Place your reptiles in the green lower half of the battlefield."
+                    )
+            else:
+                self.sounds.play_ui_negative()
             return
 
         # PHASE_BATTLE left click
@@ -316,6 +390,7 @@ class DenizensApp:
             if rules.move_unit(self.state, sel_id, clicked_hex):
                 u = self.state.get_unit(sel_id)
                 if u:
+                    self.sounds.play_move(u.spec)
                     overlap_note = (
                         " [AIRBORNE OVER UNIT — MUST LAND]"
                         if rules.is_unit_overlapping(self.state, sel_id)
@@ -330,10 +405,13 @@ class DenizensApp:
         units_here = self.state.get_units_at_hex(clicked_hex)
         if units_here:
             chosen = units_here[-1]
+            self.sounds.play_ui_positive()
             self.state.selected_unit_id = chosen.unit_id
             self.status_message = (
                 f"Selected {chosen.spec.name} ({chosen.team.upper()}) at {clicked_hex}."
             )
+        else:
+            self.sounds.play_ui_negative()
 
     def handle_left_mouse_up(self, screen_pos: Tuple[int, int]) -> None:
         if (
@@ -347,11 +425,13 @@ class DenizensApp:
                 if self._in_map_viewport(mx):
                     target_hex = self.camera.pixel_to_hex(mx, my)
                     if rules.deploy_unit_to_hex(self.state, unit.unit_id, target_hex):
+                        self.sounds.play_ui_positive()
                         self.state.selected_unit_id = unit.unit_id
                         self.status_message = (
                             f"Placed {unit.spec.name} on lower-half hex {target_hex}."
                         )
                     else:
+                        self.sounds.play_ui_negative()
                         self.status_message = (
                             "Invalid deployment hex! Place your reptiles in the green lower half of the battlefield."
                         )
@@ -360,9 +440,14 @@ class DenizensApp:
                     if rules.undeploy_unit_to_reserve(
                         self.state, unit.unit_id, preferred_slot=target_slot
                     ):
+                        self.sounds.play_ui_positive()
                         self.status_message = (
                             f"Returned {unit.spec.name} to the Army Reserve Tray."
                         )
+                    else:
+                        self.sounds.play_ui_negative()
+                else:
+                    self.sounds.play_ui_negative()
 
         self.dragging_unit_id = None
         self.is_dragging = False
@@ -371,19 +456,24 @@ class DenizensApp:
         sel_id = self.state.selected_unit_id
         unit = self.state.get_unit(sel_id)
         if unit is None or unit.hex_pos is None:
+            self.sounds.play_ui_negative()
             return
         clicked_hex = self.camera.pixel_to_hex(screen_pos[0], screen_pos[1])
         target_dir = hexgrid.hex_direction_between(unit.hex_pos, clicked_hex)
         if target_dir is not None:
             if rules.rotate_unit(self.state, unit.unit_id, target_dir):
+                self.sounds.play_ui_positive()
                 self.status_message = (
                     f"{unit.spec.name} rotated to {C.ABS_FACING_NAMES[unit.facing]} ({unit.juncture})."
                 )
             else:
+                self.sounds.play_ui_negative()
                 self.status_message = (
                     f"Cannot rotate {unit.spec.name} to {C.ABS_FACING_NAMES[target_dir]} "
                     f"(max_rotate_per_move={unit.spec.max_rotate_per_move})."
                 )
+        else:
+            self.sounds.play_ui_negative()
 
     def process_events(self) -> bool:
         for event in pygame.event.get():
@@ -465,20 +555,11 @@ class DenizensApp:
                 elif event.key == pygame.K_t and self.state.phase == C.PHASE_DEFEAT:
                     self.handle_action("return_to_splash")
                 elif event.key in (pygame.K_BACKSPACE, pygame.K_DELETE):
-                    if self.state.phase == C.PHASE_SETUP:
-                        self.handle_action("undeploy_unit")
+                    self.handle_action("undeploy_unit")
                 elif event.key == pygame.K_f:
-                    if (
-                        self.state.phase == C.PHASE_BATTLE
-                        and self.state.active_team == C.TEAM_PLAYER
-                    ):
-                        self.handle_action("juncture_attack")
+                    self.handle_action("juncture_attack")
                 elif event.key == pygame.K_SPACE:
-                    if (
-                        self.state.phase == C.PHASE_BATTLE
-                        and self.state.active_team == C.TEAM_PLAYER
-                    ):
-                        self.handle_action("end_turn")
+                    self.handle_action("end_turn")
                 elif event.key in (pygame.K_c, pygame.K_HOME):
                     self.handle_action("reset_camera")
                 elif C.ENABLE_CAMERA_ZOOM_PAN and event.key in (
@@ -520,9 +601,14 @@ class DenizensApp:
                 if event.button == 1:
                     clicked_button = False
                     for btn in self.renderer.buttons:
-                        if btn.enabled and btn.rect.collidepoint(mx, my):
-                            self.handle_action(btn.action_id)
+                        if btn.rect.collidepoint(mx, my):
                             clicked_button = True
+                            if btn.enabled:
+                                self.handle_action(btn.action_id)
+                            else:
+                                # Dispatching through handle_action plays negative click
+                                # and displays the specific reason the action is illegal
+                                self.handle_action(btn.action_id)
                             break
                     if not clicked_button:
                         if self.state.phase in (
@@ -535,6 +621,7 @@ class DenizensApp:
                                 self.state, (mx, my)
                             )
                             if uid is not None:
+                                self.sounds.play_ui_positive()
                                 self.state.selected_unit_id = uid
                                 u = self.state.get_unit(uid)
                                 if u:
@@ -542,6 +629,8 @@ class DenizensApp:
                                         f"Inspecting survivor {u.spec.name} "
                                         f"(Stage {u.spec.stage}, {u.battles_survived} battles survived)."
                                     )
+                            else:
+                                self.sounds.play_ui_negative()
                         elif self.state.phase == C.PHASE_SETUP and mx < C.MAP_VIEWPORT_X:
                             self.handle_reserve_left_down((mx, my))
                         elif mx < C.SIDEBAR_X:
@@ -639,10 +728,19 @@ class DenizensApp:
         rec = rules.execute_next_ai_action(self.state)
         self.next_ai_step_ms = now_ms + C.AI_STEP_DELAY_MS
         if rec is not None:
-            if rec.attack_results:
+            if rec.action_type == "move" and rec.unit_id is not None:
+                u = self.state.get_unit(rec.unit_id)
+                if u is not None:
+                    self.sounds.play_move(u.spec)
+                self.status_message = rec.description
+            elif rec.attack_results:
                 self._report_attack_results(rec.attack_results)
             else:
                 self.status_message = rec.description
+                if self.state.phase == C.PHASE_EVOLUTION:
+                    self.sounds.play_victory()
+                elif self.state.phase == C.PHASE_DEFEAT:
+                    self.sounds.play_defeat()
 
     def run(self) -> None:
         running = True

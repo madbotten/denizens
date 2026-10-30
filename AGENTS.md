@@ -60,5 +60,10 @@ When designing and implementing game logic for **Denizens**, ensure that the sha
   - **Mammals (Enemies — 13 Non-Evolving Forms)**: `01_rat`, `02_wolf`, `03_bear`, `04_lion`, `05_griffon`, `06_owlbear`, `07_behemoth`, `08_displacer_beast`, `09_manticore`, `10_rajang`, `11_dire_wolf`, `12_sabertooth`, `13_hell_hound`
     - Top-down hex sprites (`1024×1024` transparent RGBA PNGs): `assets/monsters/mammal/topdown/01_rat.png` .. `13_hell_hound.png`
     - Stat portraits (`1024×1024` PNGs with unified Jaculus gothic iron-and-bronze frame): `assets/monsters/mammal/portraits/01_rat.png` .. `13_hell_hound.png`
+- **Sound Effects (`assets/sounds/` — 23 `.ogg` Vorbis Audio Files, Managed by `sounds.py`)**:
+  - **UI (`assets/sounds/UI/`)**: `positiveclick.ogg`, `negativeclick.ogg`, `victory.ogg`, `defeat.ogg`
+  - **Movement (`assets/sounds/moves/`)**: `flight.ogg`, `footsteps.ogg`, `largestomp.ogg`, `softmove.ogg`
+  - **Reptile Attacks (`assets/sounds/reptileattacks/`)**: `crunch.ogg`, `dragon.ogg`, `dragtort.ogg`, `hiss.ogg`, `lizard.ogg`, `pecking.ogg`, `snap.ogg`, `snapper.ogg`
+  - **Mammal Attacks (`assets/sounds/mammalattacks/`)**: `baboon.ogg`, `deepsnarl.ogg`, `eagle.ogg`, `growl.ogg`, `hound.ogg`, `rat.ogg`, `roar.ogg`
 - **Asset Processing Tool**:
   - `tools/make_transparent.m` — Native macOS CoreGraphics/ImageIO utility for extracting transparent RGBA top-down sprites from `#181a1f` slate backgrounds and compositing the master gothic portrait frame (`--composite-frame`).

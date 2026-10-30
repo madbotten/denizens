@@ -231,3 +231,8 @@ Turtle 8-Stage Lineup:
                                turn).
   - Enter / N / T (Defeat)   : Start a new Round 1 campaign (Enter / N) or return
                                to the Title Screen (T) if all reptiles are slain.
+  - Audio Feedback (.ogg)    : Positive UI clicks, illegal/disabled action alerts,
+                               per-species creature movement sounds (flight,
+                               footsteps, soft move, heavy stomp), per-species
+                               reptile and mammal attack sounds, and battle
+                               victory/defeat fanfares.

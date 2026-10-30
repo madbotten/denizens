@@ -52,9 +52,10 @@ class SoundManager:
     history for unit tests.
     """
 
-    def __init__(self, base_dir: str, enabled: bool = True) -> None:
+    def __init__(self, base_dir: str, enabled: bool = True, mute: bool = False) -> None:
         self.base_dir: str = base_dir
         self.enabled: bool = enabled
+        self.mute: bool = mute
         self.mixer_available: bool = False
         self._cache: Dict[str, Optional[pygame.mixer.Sound]] = {}
         self.last_played_path: Optional[str] = None
@@ -132,7 +133,7 @@ class SoundManager:
         self.played_history.append(rel_path)
 
         snd = self._get_sound(rel_path)
-        if snd is not None:
+        if snd is not None and not self.mute:
             try:
                 snd.set_volume(max(0.0, min(1.0, volume)))
                 snd.play()

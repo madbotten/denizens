@@ -1131,8 +1131,8 @@ def test_all_sound_ogg_assets_and_creature_sound_mappings() -> None:
     assert len(used_move_sounds) == 4
     assert len(used_attack_sounds) == 15
 
-    # 4. Verify SoundManager preload and playback methods
-    mgr = sounds.SoundManager(project_root, enabled=True)
+    # 4. Verify SoundManager preload and playback methods (muted during pytest)
+    mgr = sounds.SoundManager(project_root, enabled=True, mute=True)
     verified_count = mgr.preload_all()
     assert verified_count == 23
 
@@ -1150,4 +1150,124 @@ def test_all_sound_ogg_assets_and_creature_sound_mappings() -> None:
         assert mgr.last_played_path == spec.move_sound_path
         assert mgr.play_attack(spec)
         assert mgr.last_played_path == spec.attack_sound_path
+
+
+def test_denizens_app_audio_integration_ui_move_attack_and_victory_defeat() -> None:
+    """
+    Phase 2 (Sound Integration Plan):
+      - Valid UI actions (`view_instructions`, `close_instructions`, `play_basic`,
+        unit rotations, `confirm_deployment`) play `positiveclick.ogg`.
+      - Illegal/disabled UI actions (`confirm_deployment` with units in Reserve,
+        illegal `juncture_attack`, illegal rotation) play `negativeclick.ogg`.
+      - Player and AI creature movements play `spec.move_sound_path`.
+      - Player and AI creature attacks play `spec.attack_sound_path`.
+      - Winning a battle plays `victory.ogg`; losing all reptiles plays `defeat.ogg`.
+    """
+    import pygame
+    import main
+    import sounds
+    from creatures import get_creature_spec
+
+    app = main.DenizensApp(mute_audio=True)
+    try:
+        app.sounds.clear_history()
+
+        # 1. Valid UI navigation -> positive click
+        app.handle_action("view_instructions")
+        assert app.sounds.last_played_path == sounds.UI_POSITIVE_PATH
+        app.handle_action("close_instructions")
+        assert app.sounds.last_played_path == sounds.UI_POSITIVE_PATH
+        app.handle_action("play_basic")
+        assert app.sounds.last_played_path == sounds.UI_POSITIVE_PATH
+
+        # 2. Confirm deployment while units are still in Reserve -> negative click
+        app.handle_action("confirm_deployment")
+        assert app.sounds.last_played_path == sounds.UI_NEGATIVE_PATH
+
+        # 3. Deploy all player units and confirm deployment -> positive click
+        lower_hexes = rules.get_valid_player_deploy_hexes(app.state)
+        for idx, pu in enumerate(app.state.get_player_army_units()):
+            assert rules.deploy_unit_to_hex(app.state, pu.unit_id, lower_hexes[idx])
+        app.handle_action("confirm_deployment")
+        assert app.sounds.last_played_path == sounds.UI_POSITIVE_PATH
+        assert app.state.phase == rules.PHASE_BATTLE
+
+        # 4. Illegal attack when no enemy is adjacent -> negative click
+        app.handle_action("juncture_attack")
+        assert app.sounds.last_played_path == sounds.UI_NEGATIVE_PATH
+
+        # 5. Player move -> plays the moving reptile's move_sound_path
+        mover = app.state.get_player_army_units()[0]
+        app.state.selected_unit_id = mover.unit_id
+        mover.hex_pos = (0, 2)
+        mover.facing = rules.FACING_N
+        mover.reset_for_turn()
+        target_move_hex = (0, 1)
+        # Ensure target_move_hex is empty
+        for u in list(app.state.units.values()):
+            if u.hex_pos == target_move_hex and u.unit_id != mover.unit_id:
+                u.hex_pos = (0, -3)
+        px, py = app.camera.hex_to_pixel(target_move_hex)
+        app.sounds.clear_history()
+        app.handle_map_left_down((int(px), int(py)))
+        assert mover.hex_pos == target_move_hex
+        assert app.sounds.last_played_path == mover.spec.move_sound_path
+
+        # 6. Player attack slaying the last enemy -> plays reptile's attack_sound_path then victory.ogg
+        for u in list(app.state.units.values()):
+            if u.team == rules.TEAM_ENEMY:
+                del app.state.units[u.unit_id]
+        rat_spec = get_creature_spec(rules.CLASS_MAMMAL, 1)
+        enemy_rat = rules.Unit(
+            unit_id="e_last_rat",
+            spec=rat_spec,
+            team=rules.TEAM_ENEMY,
+            hex_pos=(0, 0),
+            facing=rules.FACING_S,
+            hp=1,
+        )
+        app.state.units[enemy_rat.unit_id] = enemy_rat
+        mover.reset_for_turn()
+        expected_atk_sound = mover.spec.attack_sound_path
+        app.sounds.clear_history()
+        app.handle_action("juncture_attack")
+        assert app.state.phase == rules.PHASE_EVOLUTION
+        assert app.sounds.played_history == [expected_atk_sound, sounds.UI_VICTORY_PATH]
+
+        # 7. Enemy AI attack slaying the last player reptile -> plays mammal's attack_sound_path then defeat.ogg
+        app.handle_action("new_game")
+        app.state.units.clear()
+        adder_spec = get_creature_spec(rules.CLASS_SERPENT, 1)
+        lone_player = rules.Unit(
+            unit_id="p_lone_adder",
+            spec=adder_spec,
+            team=rules.TEAM_PLAYER,
+            hex_pos=(0, 1),
+            facing=rules.FACING_N,
+            hp=1,
+        )
+        wolf_spec = get_creature_spec(rules.CLASS_MAMMAL, 2)
+        enemy_wolf = rules.Unit(
+            unit_id="e_killer_wolf",
+            spec=wolf_spec,
+            team=rules.TEAM_ENEMY,
+            hex_pos=(0, 0),
+            facing=rules.FACING_S,
+            hp=wolf_spec.max_hp,
+        )
+        app.state.units[lone_player.unit_id] = lone_player
+        app.state.units[enemy_wolf.unit_id] = enemy_wolf
+        app.state.phase = rules.PHASE_BATTLE
+        app.state.active_team = rules.TEAM_ENEMY
+        app.next_ai_step_ms = 0
+        app.sounds.clear_history()
+        app.update_ai_turn()
+        assert app.state.phase == rules.PHASE_DEFEAT
+        assert app.sounds.played_history == [
+            wolf_spec.attack_sound_path,
+            sounds.UI_DEFEAT_PATH,
+        ]
+    finally:
+        pygame.quit()
+
 
